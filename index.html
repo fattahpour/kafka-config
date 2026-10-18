@@ -241,6 +241,9 @@ h1 { font-size: 15px; font-weight: 590; letter-spacing: -0.01em; line-height: 1;
 .slot.empty { fill: none; }
 .slot.read { fill: color-mix(in srgb, var(--producer) 22%, var(--lane)); }
 .slot.ok { fill: var(--producer); }
+.slot.gone { fill: none; stroke: var(--rule-2); stroke-width: 1; stroke-dasharray: 2 2; }
+#map text.so.gone { fill: var(--muted); text-decoration: line-through; }
+.legend .sw-gone { fill: none; stroke: var(--muted); stroke-dasharray: 2 2; } .legend .sw-gone-x { stroke: var(--muted); stroke-width: 1.3; }
 .slot.new { fill: var(--surface); stroke: var(--producer); stroke-width: 1.3; stroke-dasharray: 3 2; }
 #map text.so { font-size: 11px; font-weight: 590; text-anchor: middle; pointer-events: none; font-variant-numeric: tabular-nums; }
 #map text.so.ok { fill: var(--surface); }
@@ -635,6 +638,7 @@ textarea.field { max-width: none; min-height: 150px; font-family: var(--mono); f
           <li data-tip="leg:follower"><svg width="20" height="14" aria-hidden="true"><rect class="sw-F" x="1.5" y="1.5" width="17" height="11" rx="3"/></svg>Follower copy</li>
           <li data-tip="leg:saved"><svg width="14" height="14" aria-hidden="true"><rect class="sw-ok" x="1" y="1" width="12" height="12" rx="2.5"/></svg>Saved message</li>
           <li data-tip="leg:new"><svg width="14" height="14" aria-hidden="true"><rect class="sw-new" x="1.5" y="1.5" width="11" height="11" rx="2.5"/></svg>Not copied yet</li>
+          <li class="leg-compact" data-tip="leg:gone" hidden><svg width="14" height="14" aria-hidden="true"><rect class="sw-gone" x="1.5" y="1.5" width="11" height="11" rx="2.5"/><path class="sw-gone-x" d="M3 11 11 3"/></svg>Removed by compaction</li>
           <li data-tip="leg:cursor"><svg width="12" height="12" aria-hidden="true"><path class="sw-cur" d="M6 2l5 8H1z"/></svg>Read position</li>
           <li data-tip="leg:msg"><svg width="12" height="12" aria-hidden="true"><circle class="sw-m" cx="6" cy="6" r="5"/></svg>Message</li>
           <li data-tip="leg:ack"><svg width="12" height="12" aria-hidden="true"><circle class="sw-a" cx="6" cy="6" r="4"/></svg>Confirmation (ack)</li>
@@ -672,64 +676,64 @@ const PRESETS = {
     producers: 1, brokers: 1, partitions: 3, rf: 1, minIsr: 1, retention: 7, maxMsgMB: 1, replicaLag: 30,
     acks: 'all', idem: true, linger: 5, batch: 16, compression: 'lz4',
     retries: 'max', deliveryTimeout: 120, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
-    consumers: 1, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', onFail: 'dlq' },
+    consumers: 1, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', cleanup: 'delete', onFail: 'dlq' },
   safe: { label: 'Never lose a message', hint: 'Payments, orders, anything you must not drop.',
     producers: 2, brokers: 3, partitions: 6, rf: 3, minIsr: 2, retention: 30, maxMsgMB: 1, replicaLag: 30,
     acks: 'all', idem: true, linger: 5, batch: 16, compression: 'lz4',
     retries: 'max', deliveryTimeout: 300, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
-    consumers: 3, reset: 'earliest', autoCommit: false, maxPoll: 200, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', onFail: 'dlq' },
+    consumers: 3, reset: 'earliest', autoCommit: false, maxPoll: 200, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', cleanup: 'delete', onFail: 'dlq' },
   balanced: { label: 'Balanced', hint: 'A safe starting point for most services.',
     producers: 2, brokers: 3, partitions: 6, rf: 3, minIsr: 2, retention: 7, maxMsgMB: 1, replicaLag: 30,
     acks: 'all', idem: true, linger: 10, batch: 64, compression: 'lz4',
     retries: 'max', deliveryTimeout: 120, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
-    consumers: 3, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', onFail: 'dlq' },
+    consumers: 3, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', cleanup: 'delete', onFail: 'dlq' },
   bulk: { label: 'Move lots of data', hint: 'Logs, metrics, clicks. Losing a rare message is acceptable.',
     producers: 3, brokers: 3, partitions: 12, rf: 2, minIsr: 1, retention: 1, maxMsgMB: 1, replicaLag: 30,
     acks: '1', idem: false, linger: 50, batch: 256, compression: 'zstd',
     retries: 'max', deliveryTimeout: 120, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
-    consumers: 4, reset: 'latest', autoCommit: true, maxPoll: 1000, fetchMin: 65536, sessionTimeout: 45, pollInterval: 10, speed: 'fast', onFail: 'dlq' },
+    consumers: 4, reset: 'latest', autoCommit: true, maxPoll: 1000, fetchMin: 65536, sessionTimeout: 45, pollInterval: 10, speed: 'fast', cleanup: 'delete', onFail: 'dlq' },
   fast: { label: 'Lowest delay', hint: 'Live dashboards, chat, alerts.',
     producers: 2, brokers: 3, partitions: 6, rf: 3, minIsr: 2, retention: 1, maxMsgMB: 1, replicaLag: 30,
     acks: '1', idem: false, linger: 0, batch: 16, compression: 'none',
     retries: '3', deliveryTimeout: 30, requestTimeout: 10, retryBackoff: 50, maxInFlight: 5, maxBlock: 5,
-    consumers: 3, reset: 'latest', autoCommit: true, maxPoll: 100, fetchMin: 1, sessionTimeout: 15, pollInterval: 1, speed: 'fast', onFail: 'dlq' },
+    consumers: 3, reset: 'latest', autoCommit: true, maxPoll: 100, fetchMin: 1, sessionTimeout: 15, pollInterval: 1, speed: 'fast', cleanup: 'delete', onFail: 'dlq' },
   // Slow work per message: small polls and a long time limit, so a busy consumer is not thrown out of the group
   jobs: { label: 'Background jobs', hint: 'Emails to send, images to resize. Each one takes a while.',
     producers: 2, brokers: 3, partitions: 12, rf: 3, minIsr: 2, retention: 7, maxMsgMB: 1, replicaLag: 30,
     acks: 'all', idem: true, linger: 5, batch: 16, compression: 'lz4',
     retries: 'max', deliveryTimeout: 120, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
-    consumers: 6, reset: 'earliest', autoCommit: false, maxPoll: 10, fetchMin: 1, sessionTimeout: 45, pollInterval: 15, speed: 'slow', onFail: 'dlq' },
+    consumers: 6, reset: 'earliest', autoCommit: false, maxPoll: 10, fetchMin: 1, sessionTimeout: 45, pollInterval: 15, speed: 'slow', cleanup: 'delete', onFail: 'dlq' },
   // Huge numbers of tiny readings: batch and compress hard, keep only 2 copies, and keep each device's readings
   // in order (idempotence), so a retried old reading never lands after a newer one
   iot: { label: 'Sensor and device data', hint: 'Many small readings from devices. The newest matters most.',
     producers: 4, brokers: 3, partitions: 12, rf: 2, minIsr: 1, retention: 1, maxMsgMB: 1, replicaLag: 30,
     acks: 'all', idem: true, linger: 25, batch: 64, compression: 'zstd',
     retries: 'max', deliveryTimeout: 60, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 30,
-    consumers: 4, reset: 'latest', autoCommit: true, maxPoll: 1000, fetchMin: 65536, sessionTimeout: 45, pollInterval: 10, speed: 'fast', onFail: 'dlq' },
+    consumers: 4, reset: 'latest', autoCommit: true, maxPoll: 1000, fetchMin: 65536, sessionTimeout: 45, pollInterval: 10, speed: 'fast', cleanup: 'delete', onFail: 'dlq' },
   // Row changes from a database: never lose one, keep order per row, so a failing change is retried, not skipped
   cdc: { label: 'Database changes', hint: 'Row updates copied to other systems (CDC). Order per row matters.',
     producers: 1, brokers: 3, partitions: 6, rf: 3, minIsr: 2, retention: 7, maxMsgMB: 5, replicaLag: 30,
     acks: 'all', idem: true, linger: 10, batch: 64, compression: 'lz4',
     retries: 'max', deliveryTimeout: 300, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
-    consumers: 3, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', onFail: 'retry' },
+    consumers: 3, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', cleanup: 'compact', onFail: 'retry' },
   // A history kept for a month so it can be replayed or checked later; few writers, compressed well
   audit: { label: 'Audit and history log', hint: 'Who did what and when. Kept to replay or check later.',
     producers: 2, brokers: 3, partitions: 3, rf: 3, minIsr: 2, retention: 30, maxMsgMB: 1, replicaLag: 30,
     acks: 'all', idem: true, linger: 20, batch: 64, compression: 'zstd',
     retries: 'max', deliveryTimeout: 300, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
-    consumers: 2, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', onFail: 'dlq' },
+    consumers: 2, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', cleanup: 'delete', onFail: 'dlq' },
 };
 const PKEYS = Object.keys(PRESETS.balanced).filter(k => k !== 'label' && k !== 'hint');
 const STORE = 'kafka-pilot-v2';
 
-let S = { more: [], assign: 'range', goal: 'starter', topic: 'orders', host: 'kafka', group: 'orders-service', lang: 'java', keys: ['customer-42', 'customer-7'], hotKey: false };
+let S = { more: [], assign: 'range', security: 'none', goal: 'starter', topic: 'orders', host: 'kafka', group: 'orders-service', lang: 'java', keys: ['customer-42', 'customer-7'], hotKey: false };
 let importText = '', importReport = null, rk = 0;
 PKEYS.forEach(k => { S[k] = PRESETS.starter[k]; });
 try { const saved = JSON.parse(localStorage.getItem(STORE) || 'null'); if (saved) S = Object.assign(S, saved); } catch (e) {}
 const down = new Set();
 /* ---------- Share ---------- */
 // A setup travels as a short code, KP1.<base64url JSON>: in a link after #s=, or pasted into Import
-const SHARE_KEYS = [...PKEYS, 'goal', 'topic', 'host', 'group', 'lang', 'keys', 'hotKey', 'more', 'assign'];
+const SHARE_KEYS = [...PKEYS, 'goal', 'topic', 'host', 'group', 'lang', 'keys', 'hotKey', 'more', 'assign', 'security'];
 const b64u = {
   enc: t => btoa(unescape(encodeURIComponent(t))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
   dec: t => decodeURIComponent(escape(atob(t.replace(/-/g, '+').replace(/_/g, '/')))) };
@@ -834,6 +838,8 @@ function normalize() {
   S.producers = clamp(S.producers || 1, 1, 5);
   if (!SPEED[S.speed]) S.speed = 'normal';
   if (!ASSIGN[S.assign]) S.assign = 'range';
+  if (!SEC[S.security]) S.security = 'none';
+  if (S.cleanup !== 'compact') S.cleanup = 'delete';
   S.more = (Array.isArray(S.more) ? S.more : []).slice(0, 2).map(g => ({ name: String(g.name || '').slice(0, 60),
     consumers: clamp(Number(g.consumers) || 1, 1, 8), speed: SPEED[g.speed] ? g.speed : 'normal' }));
   S.brokers = clamp(S.brokers, 1, 5);
@@ -861,6 +867,29 @@ function normalize() {
 const SPEED = { fast: { ms: 10, gap: 150, label: 'About 10 ms', hint: 'Simple updates, in-memory work' },
   normal: { ms: 100, gap: 340, label: 'About 100 ms', hint: 'A database write or an API call' },
   slow: { ms: 1000, gap: 1300, label: 'About 1 second', hint: 'Image resizing, reports, slow services' } };
+// How apps and brokers connect. Certificates and passwords are placeholders to replace.
+const SEC = {
+  none: { label: 'Plain text', hint: 'No encryption and no passwords. Only for a laptop or a closed test network.', proto: 'PLAINTEXT' },
+  tls: { label: 'Encrypted (TLS)', hint: 'Traffic is encrypted and brokers prove who they are with a certificate. Anyone who can reach the brokers can still connect.', proto: 'SSL' },
+  sasl: { label: 'Encrypted, with passwords', hint: 'Recommended. TLS plus a user name and password for every app (SASL/SCRAM).', proto: 'SASL_SSL' } };
+const CA = '/etc/kafka/certs/ca.pem';
+const appUser = role => role === 'producer' ? `${topic()}-producer` : group();
+// security lines for the Java .properties files
+function javaSec(role) {
+  if (S.security === 'none') return [];
+  const L = ['', S.security === 'tls' ? '# --- Security: encrypted connection (TLS) ---' : '# --- Security: encrypted connection and a password (SASL/SCRAM over TLS) ---',
+    `security.protocol=${SEC[S.security].proto}`, "# The CA certificate that signed the brokers' certificates", 'ssl.truststore.type=PEM', `ssl.truststore.location=${CA}`];
+  if (S.security === 'sasl') L.push('sasl.mechanism=SCRAM-SHA-512', '# Replace change-me, or better, load the password from a secret store',
+    `sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="${appUser(role)}" password="change-me";`);
+  return L;
+}
+// the same for librdkafka clients (Python, Node.js, Go)
+function rdSec(role) {
+  if (S.security === 'none') return [];
+  const e = [['security.protocol', SEC[S.security].proto.toLowerCase()], ['ssl.ca.location', CA, "the CA that signed the brokers' certificates"]];
+  if (S.security === 'sasl') e.push(['sasl.mechanisms', 'SCRAM-SHA-512'], ['sasl.username', appUser(role)], ['sasl.password', 'change-me', 'load it from a secret store']);
+  return e;
+}
 // How a group shares partitions between its consumers (partition.assignment.strategy)
 const ASSIGN = {
   range: { java: 'RangeAssignor', rd: 'range', label: 'Range', hint: 'Kafka’s default. Each consumer gets a block of neighbouring partitions. The whole group stops reading while partitions move.' },
@@ -973,6 +1002,8 @@ function parts() {
 
 function checks() {
   const w = [];
+  if (S.cleanup === 'compact' && !S.keys.length) w.push({ step: 1, lvl: 'warn', text: 'A compacted topic keeps the newest message for each key, so every message needs a key. Kafka refuses messages without one. Add keys on the Producer step.' });
+  if (S.security === 'none') w.push({ step: 1, lvl: 'info', text: 'Plain text: anyone on the network can read the messages and connect. Use encryption and passwords outside a laptop or closed test network.' });
   if (S.rf === 1) w.push({ step: 1, lvl: 'warn', text: 'Each message is stored on one broker only. If that broker fails, its messages are gone. Use 3 copies for anything important.' });
   if (S.rf > 1 && S.minIsr === S.rf && S.acks === 'all') w.push({ step: 1, lvl: 'warn', text: `Writes stop as soon as any one broker is down, because all ${S.rf} copies must confirm. Set “copies that must confirm” to ${S.rf - 1}.` });
   if (S.brokers < 3) w.push({ step: 1, lvl: 'info', text: `With ${pl(S.brokers, 'broker')} you can keep at most ${pl(S.brokers, 'copy', 'copies')}. Production clusters usually start at 3.` });
@@ -1031,7 +1062,7 @@ function producerFile() {
     S.maxInFlight === 1 ? '# One request at a time per broker: order is always kept' : (S.idem ? '# Up to 5 requests at once per broker; idempotence keeps them in order' : '# Up to 5 requests at once per broker; a retry can reorder messages'),
     `max.in.flight.requests.per.connection=${S.maxInFlight}`,
     `# send() blocks at most ${S.maxBlock} s when the buffer is full or no broker is reachable, then throws`,
-    `max.block.ms=${S.maxBlock * 1000}`];
+    `max.block.ms=${S.maxBlock * 1000}`, ...javaSec('producer')];
   return L.join('\n');
 }
 function consumerFile() {
@@ -1067,6 +1098,7 @@ function consumerFile() {
   if (S.onFail === 'dlq') L.push(`# Messages your code cannot handle go to the "${topic()}.dlq" topic (see ConsumerLoop.java)`);
   if (S.more.length) L.push('', `# Other groups reading "${topic()}": ${list(S.more.map(g => `${g.name.trim() || 'other-service'} (${pl(g.consumers, 'consumer')})`))}.`,
     '# Each uses this same file with its own group.id and gets every message.');
+  L.push(...javaSec('consumer'));
   return L.join('\n');
 }
 function loopFile() {
@@ -1104,23 +1136,29 @@ function loopFile() {
   return L.join('\n');
 }
 function serverFile() {
-  const B = S.brokers, ctrl = B % 2 ? B : B - 1, h = hostPrefix();
+  const B = S.brokers, ctrl = B % 2 ? B : B - 1, h = hostPrefix(), LN = SEC[S.security].proto;
   const voters = Array.from({ length: ctrl }, (_, i) => `${i + 1}@${h}${i + 1}:9093`).join(',');
   const L = ['# server.properties (KRaft mode, no ZooKeeper)',
     `# Copy to all ${pl(B, 'broker')}. On broker N set node.id=N and its own host name.`];
   if (ctrl < B) L.push(`# Brokers 1-${ctrl} also act as controllers (an odd number is needed).`, `# On broker ${B} use process.roles=broker and drop the CONTROLLER listener.`);
   L.push('process.roles=broker,controller', 'node.id=1', `controller.quorum.voters=${voters}`,
-    'listeners=PLAINTEXT://:9092,CONTROLLER://:9093',
-    `advertised.listeners=PLAINTEXT://${h}1:9092`,
+    `listeners=${LN}://:9092,CONTROLLER://:9093`,
+    `advertised.listeners=${LN}://${h}1:9092`,
     'controller.listener.names=CONTROLLER',
-    'inter.broker.listener.name=PLAINTEXT',
-    'listener.security.protocol.map=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT',
+    `inter.broker.listener.name=${LN}`,
+    `listener.security.protocol.map=${LN}:${LN},CONTROLLER:PLAINTEXT`,
     'log.dirs=/var/lib/kafka/data', '',
+    ...(S.security === 'none' ? [] : ['# --- Security ---', '# This broker\'s private key and certificate chain, in one PEM file', 'ssl.keystore.type=PEM', 'ssl.keystore.location=/etc/kafka/certs/broker.pem',
+      'ssl.truststore.type=PEM', `ssl.truststore.location=${CA}`,
+      ...(S.security === 'sasl' ? ['sasl.enabled.mechanisms=SCRAM-SHA-512', 'sasl.mechanism.inter.broker.protocol=SCRAM-SHA-512',
+        'listener.name.sasl_ssl.scram-sha-512.sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="broker" password="change-me";'] : []),
+      '# The controller listener stays plain text here: keep it on a private network, or secure it the same way', '']),
     '# Defaults for new topics',
     `num.partitions=${S.partitions}`,
     `default.replication.factor=${S.rf}`,
     `min.insync.replicas=${S.minIsr}`,
-    `# Keep messages for ${pl(S.retention, 'day')}`,
+    S.cleanup === 'compact' ? '# Keep the newest message for each key; remove older ones with the same key' : `# Keep messages for ${pl(S.retention, 'day')}`,
+    `log.cleanup.policy=${S.cleanup}`,
     `log.retention.hours=${S.retention * 24}`,
     '# Create topics on purpose, never by a typo in client code',
     'auto.create.topics.enable=false',
@@ -1138,24 +1176,26 @@ function serverFile() {
   return L.join('\n');
 }
 function setupFile() {
-  const bs = hostList(9092)[0];
+  const bs = hostList(9092)[0], adm = S.security === 'none' ? '' : ' --command-config admin.properties';
   return ['# 1. Run once: create one cluster ID and reuse it on every broker',
     'KAFKA_CLUSTER_ID=$(bin/kafka-storage.sh random-uuid)',
     '',
     '# 2. On every broker: format storage, then start it',
-    'bin/kafka-storage.sh format -t $KAFKA_CLUSTER_ID -c config/server.properties',
+    `bin/kafka-storage.sh format -t $KAFKA_CLUSTER_ID -c config/server.properties${S.security === 'sasl' ? " --add-scram 'SCRAM-SHA-512=[name=broker,password=change-me]'" : ''}`,
     'bin/kafka-server-start.sh config/server.properties',
     '',
+    ...(S.security === 'none' ? [] : [`# 2b. admin.properties: the security lines from producer.properties${S.security === 'sasl' ? ', with the broker login' : ''}. Every tool below uses it.`,
+      ...(S.security === 'sasl' ? ['# Create a login for each app:', ...['producer', 'consumer'].map(r => `bin/kafka-configs.sh --bootstrap-server ${bs} --command-config admin.properties --alter --add-config 'SCRAM-SHA-512=[password=change-me]' --entity-type users --entity-name ${appUser(r)}`)] : []), '']),
     `# 3. Create the "${topic()}" topic`,
-    `bin/kafka-topics.sh --bootstrap-server ${bs} --create --topic ${topic()} \\`,
+    `bin/kafka-topics.sh --bootstrap-server ${bs}${adm} --create --topic ${topic()} \\`,
     `  --partitions ${S.partitions} --replication-factor ${S.rf} \\`,
-    `  --config min.insync.replicas=${S.minIsr} --config retention.ms=${S.retention * 86400000}`,
+    `  --config min.insync.replicas=${S.minIsr} ${S.cleanup === 'compact' ? '--config cleanup.policy=compact' : `--config retention.ms=${S.retention * 86400000}`}`,
     ...(S.onFail === 'dlq' ? ['', `# 3b. Dead-letter topic for messages your code could not handle (kept 30 days)`,
-      `bin/kafka-topics.sh --bootstrap-server ${bs} --create --topic ${topic()}.dlq \\`,
+      `bin/kafka-topics.sh --bootstrap-server ${bs}${adm} --create --topic ${topic()}.dlq \\`,
       `  --partitions 1 --replication-factor ${S.rf} --config retention.ms=2592000000`] : []),
     '',
     '# 4. Check which brokers hold each partition',
-    `bin/kafka-topics.sh --bootstrap-server ${bs} --describe --topic ${topic()}`,
+    `bin/kafka-topics.sh --bootstrap-server ${bs}${adm} --describe --topic ${topic()}`,
     '',
     '# 5. Send and read a test message',
     `bin/kafka-console-producer.sh --bootstrap-server ${bs} --topic ${topic()} --producer.config producer.properties`,
@@ -1169,7 +1209,7 @@ function rdProducer() {
   if (S.acks !== '0') e.push(['retries', S.retries === 'max' ? 2147483647 : Number(S.retries)],
     ['delivery.timeout.ms', S.deliveryTimeout * 1000], ['request.timeout.ms', S.requestTimeout * 1000],
     ['retry.backoff.ms', S.retryBackoff], ['retry.backoff.max.ms', Math.max(1000, S.retryBackoff)]);
-  e.push(['max.in.flight.requests.per.connection', S.maxInFlight]);
+  e.push(['max.in.flight.requests.per.connection', S.maxInFlight], ...rdSec('producer'));
   return e;
 }
 function rdConsumer(storeOffsets) {
@@ -1179,7 +1219,7 @@ function rdConsumer(storeOffsets) {
   e.push(['fetch.min.bytes', S.fetchMin], ['fetch.wait.max.ms', 500, 'Java name: fetch.max.wait.ms'],
     ['max.partition.fetch.bytes', msgBytes()], ['fetch.max.bytes', Math.max(52428800, msgBytes())],
     ['session.timeout.ms', S.sessionTimeout * 1000], ['heartbeat.interval.ms', Math.floor(S.sessionTimeout * 1000 / 3)],
-    ['max.poll.interval.ms', S.pollInterval * 60000], ['partition.assignment.strategy', ASSIGN[S.assign].rd]);
+    ['max.poll.interval.ms', S.pollInterval * 60000], ['partition.assignment.strategy', ASSIGN[S.assign].rd], ...rdSec('consumer'));
   return e;
 }
 const dictLines = (entries, q, ind, cmt, bools) => entries.map(([k, v, note]) =>
@@ -1273,6 +1313,12 @@ function springFile() {
     `#       (record, ex) -> new TopicPartition("${t}.dlq", -1)),`, '#     new FixedBackOff(1000L, 2L));  // 2 quick retries, then the dead-letter topic');
   else L.push('#   return new DefaultErrorHandler(new FixedBackOff(1000L, FixedBackOff.UNLIMITED_ATTEMPTS));');
   L.push('# }');
+  if (S.security !== 'none') {
+    L.push('', '# Security: add under spring.kafka (one login for the whole app here; split it if producer and consumer use different users)',
+      '    security:', `      protocol: ${SEC[S.security].proto}`, '    ssl:', '      trust-store-type: PEM', `      trust-store-location: file:${CA}`);
+    if (S.security === 'sasl') L.push('    properties:', '      sasl.mechanism: SCRAM-SHA-512',
+      `      sasl.jaas.config: org.apache.kafka.common.security.scram.ScramLoginModule required username="${appUser('consumer')}" password="change-me";`);
+  }
   return L.join('\n');
 }
 function composeFile() {
@@ -1280,7 +1326,8 @@ function composeFile() {
   const voters = Array.from({ length: ctrl }, (_, i) => `${i + 1}@kafka${i + 1}:9093`).join(',');
   const L = ['# docker-compose.yml: run this cluster on your machine with "docker compose up -d"',
     `# Apps on your machine connect to ${Array.from({ length: B }, (_, i) => `localhost:${29091 + i}`).join(',')}`,
-    '# Apps inside this compose network use kafka1:9092, kafka2:9092 and so on', 'services:'];
+    '# Apps inside this compose network use kafka1:9092, kafka2:9092 and so on',
+    ...(S.security === 'none' ? [] : ['# This local cluster uses plain text so it runs without certificates. Point apps at it with', '# security.protocol=PLAINTEXT; your real cluster uses the security settings in the other files.']), 'services:'];
   for (let id = 1; id <= B; id++) {
     const isCtrl = id <= ctrl, port = 29090 + id;
     L.push(`  kafka${id}:`, '    image: apache/kafka:3.9.0', `    hostname: kafka${id}`, `    ports: ["${port}:${port}"]`, '    environment:',
@@ -1307,7 +1354,7 @@ function composeFile() {
       '      KAFKA_UNCLEAN_LEADER_ELECTION_ENABLE: "false"');
   }
   L.push('', '# When the brokers are up, create the topic:',
-    `# docker compose exec kafka1 /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka1:9092 --create --topic ${topic()} --partitions ${S.partitions} --replication-factor ${S.rf} --config min.insync.replicas=${S.minIsr}`);
+    `# docker compose exec kafka1 /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka1:9092 --create --topic ${topic()} --partitions ${S.partitions} --replication-factor ${S.rf} --config min.insync.replicas=${S.minIsr}${S.cleanup === 'compact' ? ' --config cleanup.policy=compact' : ''}`);
   return L.join('\n');
 }
 const FILES = {
@@ -1384,6 +1431,9 @@ const IMPORT = {
   'fetch.min.bytes': ['fetchMin', v => size(v) <= 1 ? 1 : 65536],
   'session.timeout.ms': ['sessionTimeout', v => num(v) / 1000],
   'max.poll.interval.ms': ['pollInterval', v => num(v) / 60000],
+  'cleanup.policy': ['cleanup', v => /compact/i.test(v) ? 'compact' : 'delete'],
+  'log.cleanup.policy': ['cleanup', v => /compact/i.test(v) ? 'compact' : 'delete'],
+  'security.protocol': ['security', v => /sasl/i.test(v) ? 'sasl' : /ssl/i.test(v) ? 'tls' : 'none'],
   'partition.assignment.strategy': ['assign', v => /cooperative/i.test(v) ? 'sticky' : /roundrobin/i.test(v) ? 'roundrobin' : 'range'],
   'num.partitions': ['partitions', num],
   'default.replication.factor': ['rf', num],
@@ -1563,6 +1613,12 @@ function controlsHtml() {
       { v: 1, label: '1 day', hint: 'Short replay window, small disks' },
       { v: 7, label: '7 days', hint: "Kafka's default" },
       { v: 30, label: '30 days', hint: 'Replay a month of history' }], 'Messages stay after they are read, so other services can read them too.') +
+    choice('cleanup', 'What happens to old messages?', 'cleanup.policy', [
+      { v: 'delete', label: 'Delete them after that time', hint: 'Every message is kept for the time above, then removed.' },
+      { v: 'compact', label: 'Keep the newest per key', hint: 'Older messages with the same key are removed; the newest one stays. Good for state, like each customer’s current address.' }],
+      S.cleanup === 'compact' ? 'Watch the logs: crossed-out slots were removed because a newer message has the same key. Messages without a key are refused.' : '') +
+    choice('security', 'How do apps connect to the brokers?', 'security.protocol', Object.entries(SEC).map(([v, x]) => ({ v, label: x.label, hint: x.hint })),
+      S.security === 'none' ? '' : 'The files use the CA certificate at ' + CA + ' and the password change-me. Replace both before you deploy.') +
     `<div class="note info">${ICON.info}<div>Try it: select a broker’s name in the diagram to switch it off and see which partitions keep working.</div></div>` +
     `<div class="sub"><h3>Limits and slow brokers</h3>` +
     choice('maxMsgMB', 'Largest single message', 'message.max.bytes', [
@@ -1674,7 +1730,7 @@ function explainHtml() {
   if (id === 'goal') {
     facts = `<li class="p">${ackText}</li><li class="b">${store} ${writes}</li><li class="c">${pl(C, 'consumer')} in group “${esc(group())}” share ${pl(P, 'partition')}, and each starts reading ${S.reset === 'earliest' ? 'from the beginning' : 'from new messages only'}.</li>`;
   } else if (id === 'cluster') {
-    facts = `<li class="b">${store}</li><li class="b">${writes}</li><li class="b">The topic has ${pl(P, 'partition')}. Each one has a leader that takes all reads and writes, and followers that copy it.</li><li class="b">Messages are kept for ${pl(S.retention, 'day')}, even after they are read.</li><li class="b">Messages can be up to ${S.maxMsgMB} MB. Larger ones are refused with RecordTooLargeException.</li>`;
+    facts = `<li class="b">${store}</li><li class="b">${writes}</li><li class="b">The topic has ${pl(P, 'partition')}. Each one has a leader that takes all reads and writes, and followers that copy it.</li><li class="b">${S.cleanup === 'compact' ? 'Kafka keeps the newest message for each key and removes older ones with the same key, so the topic holds the latest state.' : `Messages are kept for ${pl(S.retention, 'day')}, even after they are read.`}</li><li class="b">Messages can be up to ${S.maxMsgMB} MB. Larger ones are refused with RecordTooLargeException.</li>`;
     file = 'server.properties';
   } else if (id === 'producer') {
     facts = `<li class="p">${ackText}</li><li class="p">${S.idem ? 'Retries never create duplicates.' : 'A retry after a lost confirmation can store the same message twice.'}</li><li class="p">${batchText}</li><li class="p">${comp}</li><li class="p">Messages with the same key always go to the same partition, so they stay in order.</li>`;
@@ -1780,7 +1836,7 @@ let logs = [];
 // A new group starts at the oldest stored message or at the end, as auto.offset.reset says.
 function syncLogs() {
   const n = 1 + S.more.length;
-  while (logs.length < S.partitions) { const leo = 20 + Math.floor(Math.random() * 60), c = leo - (logs.length % 3); logs.push({ leo, hw: leo, start: Math.max(0, leo - 40), cons: [c], pos: [c] }); }
+  while (logs.length < S.partitions) { const leo = 20 + Math.floor(Math.random() * 60), c = leo - (logs.length % 3); logs.push({ leo, hw: leo, start: Math.max(0, leo - 40), cons: [c], pos: [c], keyAt: new Map(), gone: new Set() }); }
   logs.length = S.partitions;
   for (const L of logs) {
     // retention keeps roughly the last 60 messages of each partition in this simulation
@@ -1841,7 +1897,8 @@ function lagText(p) {
   if (n.length === 1) return n[0] > 0 ? `lag ${n[0]}` : '';
   return n.map((v, g) => v > 0 ? `<tspan class="g${g}">${v}</tspan>` : '').filter(Boolean).join(' ');
 }
-function slotState(L, o) { return o < 0 ? 'empty' : o < Math.min(...L.cons) ? 'read' : o < L.hw ? 'ok' : 'new'; }
+// compaction crosses out older messages whose key came again
+function slotState(L, o) { return o < 0 ? 'empty' : L.gone.has(o) ? 'gone' : o < Math.min(...L.cons) ? 'read' : o < L.hw ? 'ok' : 'new'; }
 function tapeSlots(p) {
   const L = logs[p], y = G.rowY(p);
   let s = '';
@@ -2058,6 +2115,7 @@ function drawMap() {
   map.setAttribute('viewBox', `0 0 1000 ${H}`);
   map.innerHTML = s;
   map.dataset.focus = STEPS[step].focus;
+  document.querySelector('.leg-compact').hidden = S.cleanup !== 'compact';
   if (gFocus !== null && gFocus >= G.gs.length) gFocus = null;
   map.dataset.gf = gFocus === null ? '' : gFocus;
   map.setAttribute('aria-label', `Producer writes to topic ${topic()}: ${pl(P, 'partition')}, each an append-only log with ${pl(S.rf, 'copy', 'copies')} spread over ${pl(B, 'broker')}, read by ${pl(C, 'consumer')}.`);
@@ -2151,6 +2209,18 @@ function lagFix(id) {
 }
 
 /* ---------- Animation ---------- */
+// Background compaction: in the committed part of each log (except the newest few), an older message is removed
+// when a newer one has the same key
+function compactLogs() {
+  for (let p = 0; p < G.P; p++) {
+    const L = logs[p], last = new Map();
+    for (const [o, k] of L.keyAt) { if (o < L.leo - 60) { L.keyAt.delete(o); L.gone.delete(o); } else if (o < L.hw) last.set(k, Math.max(last.get(k) ?? -1, o)); }
+    let changed = false;
+    for (const [o, k] of L.keyAt) if (o < L.hw - 3 && last.get(k) > o && !L.gone.has(o)) { L.gone.add(o); changed = true; }
+    if (changed) updateTape(p);
+  }
+}
+let lastCompact = 0;
 let msgs = [], running = !reduce, lastSpawn = 0, rr = 0, rp0 = 0, busy = {}, lastLagT = 0;
 function along(a, f) {
   f = clamp(f, 0, 1);
@@ -2177,7 +2247,8 @@ function replyNote(kind, st, now) {
 const ease = f => f < .5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
 function spawn(now) {
   // Keyed messages always go to their own partition, even when it is offline
-  if (S.keys.length && Math.random() < (S.hotKey ? .8 : .45)) {
+  // a compacted topic only takes keyed messages, so send keyed ones whenever there are keys
+  if (S.keys.length && (S.cleanup === 'compact' || Math.random() < (S.hotKey ? .8 : .45))) {
     const key = S.hotKey ? S.keys[0] : S.keys[rk++ % S.keys.length];
     msgs.push({ kind: 'msg', p: partitionFor(key), key, src: Math.floor(Math.random() * G.N), t0: now, phase: 'out', first: true });
     return;
@@ -2214,6 +2285,7 @@ function frame(now) {
   if (now - lastSpawn > (700 + S.linger * 7) / G.N && msgs.length < 320) { lastSpawn = now; spawn(now); }
   readStep(now);
   if (now - lastLagT > 1000) { lastLagT = now; sampleLag(); }
+  if (S.cleanup === 'compact' && now - lastCompact > 2500) { lastCompact = now; compactLogs(); }
   rebal.forEach((rb, g) => { if (rb && rb.until <= now && !rb.cleared) { rb.cleared = true; endRebalance(g); } });
   const layer = $('dots'); if (!layer) return;
   for (const m of msgs) {
@@ -2231,10 +2303,14 @@ function frame(now) {
     if (t < 0) pos = null;
     else if (m.kind === 'msg') {
       if (t >= 1000) {
-        if (!st.writable) { m.kind = 'err'; m.t0 = now; m.note = ''; if (m.first) m.note = replyNote('err', st, now); if (m.el) { m.el.remove(); m.el = null; } pos = outPath(m.p, m.src).at(-1); }
+        if (S.cleanup === 'compact' && !m.key && st.writable) {
+          // Kafka refuses an unkeyed message on a compacted topic
+          m.kind = 'err'; m.t0 = now; m.first = false; m.note = noteFree(now) ? (lastNote = now, 'error: a compacted topic needs a key') : '';
+          if (m.el) { m.el.remove(); m.el = null; } pos = outPath(m.p, m.src).at(-1);
+        } else if (!st.writable) { m.kind = 'err'; m.t0 = now; m.note = ''; if (m.first) m.note = replyNote('err', st, now); if (m.el) { m.el.remove(); m.el = null; } pos = outPath(m.p, m.src).at(-1); }
         else {
           // the leader appends it to the end of the log; it counts as committed once the in-sync copies have it
-          m.dead = true; L.leo++; updateTape(m.p, true);
+          m.dead = true; L.leo++; if (m.key) L.keyAt.set(L.leo - 1, m.key); else L.keyAt.set(L.leo - 1, 'k' + Math.floor(Math.random() * 4)); updateTape(m.p, true);
           const followers = st.alive.filter(b => b !== st.leader);
           if (m.first) for (const b of followers) msgs.push({ kind: 'rep', p: m.p, to: b, from: st.leader, t0: now });
           msgs.push({ kind: 'commit', p: m.p, src: m.src, off: L.leo - 1, first: m.first, t0: now + (followers.length ? 650 : 0) });
@@ -2416,7 +2492,7 @@ function tipText(key) {
     case 'prod': return ['Producer', `Your app's Kafka client. It sends each message to the topic and ${wait} (acks=${S.acks}).${S.producers > 1 ? ` ${S.producers} apps send to the same partitions.` : ''}`];
     case 'acks': return [`acks=${a}`, { '0': 'Don’t wait for any reply. Fastest, but a lost message goes unnoticed.', '1': 'Wait until the partition leader has saved the message. If the leader crashes before the followers copy it, it is lost.', all: 'Wait until every in-sync copy has saved the message. Safest: writes are refused when too few copies are online.' }[a]];
     case 'part': return [`hash % ${S.partitions}`, `How Kafka picks a partition for a message with a key. <em>hash</em> turns the key into a big number (the murmur2 function; the same key always gives the same number). <em>%</em> means “the remainder after dividing”: dividing by ${S.partitions} leaves 0 to ${S.partitions - 1}, and that remainder is the partition number. Click for a worked example.`];
-    case 'topic': return [`Topic ${esc(topic())}`, `A named stream of messages, split into ${pl(S.partitions, 'partition')} so several brokers and consumers can share the work. Messages are kept for ${pl(S.retention, 'day')}, even after they are read.`];
+    case 'topic': return [`Topic ${esc(topic())}`, `A named stream of messages, split into ${pl(S.partitions, 'partition')} so several brokers and consumers can share the work.${S.cleanup === 'compact' ? ' Compacted: the newest message per key is kept.' : ''} Messages are kept for ${pl(S.retention, 'day')}, even after they are read.`];
     case 'broker': {
       const leads = G.parts.filter(st => st.leader === n).length, holds = G.parts.filter(st => st.reps.includes(n)).length;
       return [`Broker ${n + 1}`, down.has(n) ? 'Switched off. Partitions that had a copy elsewhere moved their leader to another broker. Click to switch it back on.'
@@ -2426,7 +2502,7 @@ function tipText(key) {
       const st = G.parts[n], L = logs[n]; if (!st || !L) return null;
       const where = st.leader === null ? 'It has no leader: every copy is on a broker that is off, so nobody can write or read it.' : `Broker ${st.leader + 1} leads it.`;
       const reads = gs.map((gr, g) => `${esc(gr.name)} has read up to offset ${L.cons[g] - 1} (lag ${Math.max(0, L.hw - L.cons[g])})`).join('; ');
-      return [`Partition P${n}`, `An append-only log. Each new message gets the next number (offset) at the right end; the next one is ${L.leo}. ${where} Solid slots are copied to every in-sync copy; dashed ones are not yet, so nobody can read them. ${reads}.`];
+      return [`Partition P${n}`, `An append-only log. Each new message gets the next number (offset) at the right end; the next one is ${L.leo}. ${where} Solid slots are copied to every in-sync copy; dashed ones are not yet, so nobody can read them.${S.cleanup === 'compact' ? ' Crossed-out slots were removed by compaction: a newer message has the same key.' : ''} ${reads}.`];
     }
     case 'copy': {
       const st = G.parts[n], bk = Number(b); if (!st) return null;
@@ -2463,6 +2539,7 @@ function tipText(key) {
       leader: ['Leader copy', 'The copy of a partition that takes every write and read.'], follower: ['Follower copy', 'A copy that keeps up with the leader and takes over if its broker fails.'],
       saved: ['Saved message', 'Stored on every in-sync copy (below the high watermark). Consumers can read it. Faded once every group has read it.'],
       new: ['Not copied yet', 'Saved on the leader but not yet on every in-sync copy. Consumers cannot read it until it is.'],
+      gone: ['Removed by compaction', 'An older message whose key appeared again later. Compaction keeps only the newest message per key.'],
       cursor: ['Read position', 'Where a consumer group has read up to in this partition (its committed offset). Each group has its own.'],
       msg: ['Message', 'A message travelling from a producer to its partition.'], ack: ['Confirmation (ack)', 'The broker telling the producer that a message is saved.'],
       err: ['Refused write (error)', 'The broker refusing a message, for example when too few copies are online. The producer retries.'] }[a];

@@ -2,7 +2,7 @@
 // usage: node tests/kafka/dump.js <outdir> <kind-of-data> [assign]
 const { chromium } = require('playwright-core');
 const fs = require('fs'), path = require('path');
-const [out, goal = 'balanced', assign = 'range'] = process.argv.slice(2);
+const [out, goal = 'balanced', assign = 'range', security = 'none'] = process.argv.slice(2);
 (async () => {
   const page_ = path.join(__dirname, '..', 'out', 'page.html');
   fs.mkdirSync(path.dirname(page_), { recursive: true });
@@ -12,6 +12,7 @@ const [out, goal = 'balanced', assign = 'range'] = process.argv.slice(2);
   const page = await ctx.newPage(); await page.goto('file://' + page_);
   await page.selectOption('#pb-goal', goal);
   await page.click('.steps button[data-goto="3"]'); await page.click(`input[name="assign"][value="${assign}"]`, { force: true });
+  await page.click('.steps button[data-goto="1"]'); await page.click(`input[name="security"][value="${security}"]`, { force: true });
   const files = await page.evaluate(() => window.__kp.files());
   fs.mkdirSync(out, { recursive: true });
   for (const [n, t] of Object.entries(files)) fs.writeFileSync(path.join(out, n), t + '\n');

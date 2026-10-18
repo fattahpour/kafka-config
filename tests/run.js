@@ -227,6 +227,23 @@ test('every challenge can be solved with the controls', async () => {
   noErrors(page); await page.context().close();
 });
 
+test('compaction crosses out older messages per key; security reaches every file', async () => {
+  const page = await open({ settle: 2600 });
+  await page.selectOption('#pb-goal', 'cdc'); await page.waitForTimeout(9000);
+  assert(await page.evaluate(() => window.__kp.S().cleanup) === 'compact', 'Database changes should default to compaction');
+  assert((await page.$$('.slot.gone')).length > 0, 'no slot was removed by compaction after 9 s');
+  assert(!(await page.$('.leg-compact[hidden]')), 'compaction legend entry is hidden');
+  await page.click('.steps button[data-goto="1"]'); await page.click('input[name="security"][value="sasl"]', { force: true });
+  const f = await page.evaluate(() => window.__kp.files());
+  const need = [['producer.properties', 'security.protocol=SASL_SSL'], ['producer.properties', 'ScramLoginModule required username="orders-producer"'],
+    ['consumer.properties', 'sasl.mechanism=SCRAM-SHA-512'], ['server.properties', 'listeners=SASL_SSL://:9092'], ['server.properties', 'log.cleanup.policy=compact'],
+    ['setup.sh', '--config cleanup.policy=compact'], ['setup.sh', "--add-scram 'SCRAM-SHA-512=[name=broker"], ['kafka_client.py', '"sasl.username": "orders-service"'],
+    ['kafka-client.js', "'security.protocol': 'sasl_ssl'"], ['kafka_client.go', '"ssl.ca.location"'], ['application.yml', 'protocol: SASL_SSL']];
+  const miss = need.filter(([n, x]) => !f[n].includes(x)).map(([n, x]) => `${n}: ${x}`);
+  assert(!miss.length, 'missing in files: ' + miss.join(' | '));
+  noErrors(page); await page.context().close();
+});
+
 test('theme switch cycles and is remembered', async () => {
   const page = await open();
   const theme = () => page.evaluate(() => document.documentElement.getAttribute('data-theme') || 'auto');

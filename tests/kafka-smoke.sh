@@ -10,6 +10,9 @@ pass() { echo "  ✓ $*"; }
 fail() { echo "  ✗ $*"; FAIL=1; }
 rm -rf "$OUT"; node tests/kafka/dump.js "$OUT" balanced range >/dev/null
 node tests/kafka/dump.js "$OUT/sticky" balanced sticky >/dev/null
+node tests/kafka/dump.js "$OUT/cdc" cdc range >/dev/null
+node tests/kafka/dump.js "$OUT/sec" balanced range sasl >/dev/null
+openssl req -x509 -newkey rsa:2048 -nodes -keyout "$OUT/sec/ca.key" -out "$OUT/sec/ca.pem" -days 1 -subj "/CN=kafka-pilot-test-ca" >/dev/null 2>&1
 DC="docker compose -p $P -f $OUT/docker-compose.yml"
 cleanup() { $DC down -v --remove-orphans >/dev/null 2>&1; }
 trap cleanup EXIT
@@ -70,6 +73,34 @@ echo "kafka-client.js (@confluentinc/kafka-javascript)"
   sed "s/'group.id': '[^']*'/'group.id': 'node-check'/" "$OUT/kafka-client.js"; } > "$OUT/node_check.js"
 NODEOUT=$(docker run --rm --network "$NET" -v "$PWD/$OUT:/w" -w /tmp node:22-slim sh -c "npm i -s @confluentinc/kafka-javascript >/dev/null 2>&1 && cp /w/node_check.js . && node node_check.js" 2>&1)
 echo "$NODEOUT" | grep -q "NODEREAD [5-9]" && pass "Node producer and consumer configs accepted; read 5 messages" || fail "node: $(echo "$NODEOUT" | tail -5)"
+
+echo "compaction (Database changes)"
+CCREATE=$(grep '^# docker compose exec' "$OUT/cdc/docker-compose.yml" | sed 's/^# docker compose exec kafka1 \/opt\/kafka\/bin\///; s/--topic orders /--topic orders-compact /')
+eval "K kafka1 $CCREATE" >/dev/null 2>&1 && K kafka1 kafka-configs.sh --bootstrap-server kafka1:9092 --describe --topic orders-compact 2>/dev/null | grep -q "cleanup.policy=compact" \
+  && pass "generated command creates a compacted topic" || fail "compacted topic not created: $CCREATE"
+NOKEY=$(echo "no-key-here" | K kafka1 kafka-console-producer.sh --bootstrap-server kafka1:9092 --topic orders-compact --producer.config /tmp/producer.properties \
+  --producer-property delivery.timeout.ms=15000 --producer-property request.timeout.ms=5000 2>&1)
+echo "$NOKEY" | grep -qiE "without key|CORRUPT_MESSAGE|InvalidRecord" && pass "a message without a key is refused, as the page warns" || fail "unkeyed message was not refused: $(echo "$NOKEY" | tail -2)"
+
+echo "security settings (SASL/SCRAM over TLS)"
+sed "s#^ssl.truststore.location=.*#ssl.truststore.location=/tmp/ca.pem#" "$OUT/sec/producer.properties" > "$OUT/sec/p.properties"
+$DC cp "$OUT/sec/p.properties" kafka1:/tmp/p-sasl.properties >/dev/null; $DC cp "$OUT/sec/ca.pem" kafka1:/tmp/ca.pem >/dev/null
+JSEC=$(printf '' | K kafka1 kafka-console-producer.sh --bootstrap-server kafka1:9092 --topic orders --producer.config /tmp/p-sasl.properties 2>&1)
+echo "$JSEC" | grep -qE "ConfigException|Failed to construct|KafkaException|LoginException" && fail "Java client rejected the security settings: $(echo "$JSEC" | grep -E 'Exception' | head -2)" \
+  || pass "Java client loads security.protocol, the PEM truststore and the SCRAM login"
+cat > "$OUT/sec/py_sec.py" <<'PY'
+import ast, re
+from confluent_kafka import Producer, Consumer
+src = open('/w/kafka_client.py').read()
+for name, cls in (('producer', Producer), ('consumer', Consumer)):
+    body = re.search(name + r' = \w+\((\{.*?\n\})\)', src, re.S).group(1)
+    conf = ast.literal_eval(re.sub(r'#[^\n]*', '', body))
+    conf['ssl.ca.location'] = '/w/ca.pem'
+    c = cls(conf)
+    print('PYSEC', name, conf['security.protocol'], conf['sasl.mechanisms'])
+PY
+PYSEC=$(docker run --rm -v "$PWD/$OUT/sec:/w" python:3.12-slim sh -c "pip install -q confluent-kafka >/dev/null 2>&1 && python /w/py_sec.py" 2>&1)
+[ "$(echo "$PYSEC" | grep -c '^PYSEC .* sasl_ssl SCRAM-SHA-512')" = 2 ] && pass "librdkafka accepts the Python security settings" || fail "python security: $(echo "$PYSEC" | tail -3)"
 
 echo "a broker goes down"
 K kafka1 kafka-topics.sh --bootstrap-server kafka1:9092 --create --topic strict --partitions 1 --replication-factor 3 --config min.insync.replicas=3 >/dev/null 2>&1
