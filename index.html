@@ -371,6 +371,26 @@ h1 { font-size: 15px; font-weight: 590; letter-spacing: -0.01em; line-height: 1;
 .chal-win .ic { color: var(--ok); flex: none; }
 .chal-win p { margin: 0; }
 .chal-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.semtoggle { display: flex; }
+.sempanel { display: grid; gap: 12px; }
+.semtabs { display: flex; gap: 6px; }
+.semtabs [aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.semcols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 10px; }
+.semcol { display: grid; gap: 8px; align-content: start; padding: 12px; border: 1px solid var(--rule); border-radius: 10px; background: var(--code-bg); min-width: 0; }
+.semcol.current { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.semcol h4 { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 15px; }
+.semcol h4 .ic { color: var(--accent); }
+.semnow { margin-left: auto; font-size: 11.5px; font-weight: 590; color: var(--accent); }
+.semcol p { margin: 0; font-size: 13.5px; }
+.sempromise { font-weight: 590; }
+.semcrash { color: var(--ink-2); }
+.semcfg { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: 12.5px; }
+.semcfg code, .semcode { font-family: var(--mono); font-size: 12px; }
+.semcode { margin: 0; padding: 10px; border-radius: 6px; background: var(--surface); border: 1px solid var(--rule); overflow-x: auto; line-height: 1.55; white-space: pre; }
+.semcol .btn { justify-self: start; }
+.pastebox summary { display: flex; align-items: center; gap: 8px; min-height: 40px; cursor: pointer; font-weight: 590; font-size: 15px; }
+.pastebox summary .ic { color: var(--accent); }
+.pastebox[open] summary { margin-bottom: 4px; }
 .tip { position: fixed; z-index: 60; max-width: 300px; padding: 9px 12px; border-radius: 8px; background: var(--ink); color: var(--paper); font-size: 13px; line-height: 1.45; box-shadow: 0 10px 30px rgba(8, 9, 10, .28); pointer-events: none; }
 .tip b { display: block; margin-bottom: 2px; font-weight: 650; }
 #map [data-tip], .legend [data-tip], .pcount[data-tip], .lag-groups [data-tip] { cursor: help; }
@@ -590,6 +610,12 @@ textarea.field { max-width: none; min-height: 150px; font-family: var(--mono); f
 .pselect .ic { color: var(--muted); }
 .ackseg { cursor: pointer; outline: none; }
 .ackseg rect { fill: var(--surface); stroke: var(--rule-2); stroke-width: 1; transition: fill .15s, stroke .15s; }
+.ackpanel { fill: color-mix(in srgb, var(--producer) 5%, var(--surface)); stroke: color-mix(in srgb, var(--producer) 35%, var(--rule)); stroke-width: 1; }
+#map text.acktitle { font-size: 11.5px; font-weight: 650; letter-spacing: .04em; fill: var(--producer); }
+#map .ackseg text.ackv { font-family: var(--mono); font-size: 12px; font-weight: 650; }
+#map .ackseg text.ackw { font-size: 12px; font-weight: 510; }
+.ackdot { fill: var(--producer); }
+#map .ackseg.on .ackdot { fill: var(--surface); }
 .ackseg text { font-size: 12px; font-weight: 590; fill: var(--ink-2); pointer-events: none; }
 .ackseg:hover rect { stroke: var(--producer); }
 .ackseg:focus-visible rect { stroke: var(--producer); stroke-width: 2.5; }
@@ -763,14 +789,14 @@ const PRESETS = {
 const PKEYS = Object.keys(PRESETS.balanced).filter(k => k !== 'label' && k !== 'hint');
 const STORE = 'kafka-pilot-v2';
 
-let S = { more: [], assign: 'range', security: 'none', racks: false, retBytes: 0, compactLag: 0, bufferMB: 32, staticMember: false, commitEvery: 5, goal: 'starter', topic: 'orders', host: 'kafka', group: 'orders-service', lang: 'java', keys: ['customer-42', 'customer-7'], hotKey: false };
+let S = { more: [], commitWhen: 'after', assign: 'range', security: 'none', racks: false, retBytes: 0, compactLag: 0, bufferMB: 32, staticMember: false, commitEvery: 5, goal: 'starter', topic: 'orders', host: 'kafka', group: 'orders-service', lang: 'java', keys: ['customer-42', 'customer-7'], hotKey: false };
 let importText = '', importReport = null, rk = 0;
 PKEYS.forEach(k => { S[k] = PRESETS.starter[k]; });
 try { const saved = JSON.parse(localStorage.getItem(STORE) || 'null'); if (saved) S = Object.assign(S, saved); } catch (e) {}
 const down = new Set();
 /* ---------- Share ---------- */
 // A setup travels as a short code, KP1.<base64url JSON>: in a link after #s=, or pasted into Import
-const SHARE_KEYS = [...PKEYS, 'goal', 'topic', 'host', 'group', 'lang', 'keys', 'hotKey', 'more', 'assign', 'security', 'racks', 'retBytes', 'compactLag', 'bufferMB', 'staticMember', 'commitEvery'];
+const SHARE_KEYS = [...PKEYS, 'goal', 'topic', 'host', 'group', 'lang', 'keys', 'hotKey', 'more', 'commitWhen', 'assign', 'security', 'racks', 'retBytes', 'compactLag', 'bufferMB', 'staticMember', 'commitEvery'];
 const b64u = {
   enc: t => btoa(unescape(encodeURIComponent(t))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
   dec: t => decodeURIComponent(escape(atob(t.replace(/-/g, '+').replace(/_/g, '/')))) };
@@ -885,6 +911,8 @@ function normalize() {
   if (![32, 64, 128].includes(S.bufferMB)) S.bufferMB = 32;
   S.commitEvery = clamp(Number(S.commitEvery) || 5, 1, 30);
   S.racks = !!S.racks; S.staticMember = !!S.staticMember;
+  if (S.commitWhen !== 'before' || S.autoCommit) S.commitWhen = S.autoCommit ? 'after' : S.commitWhen === 'before' ? 'before' : 'after';
+  S.semantic = semanticOf();
   if (S.cleanup !== 'compact') S.cleanup = 'delete';
   S.more = (Array.isArray(S.more) ? S.more : []).slice(0, 2).map(g => ({ name: String(g.name || '').slice(0, 60),
     consumers: clamp(Number(g.consumers) || 1, 1, 8), speed: SPEED[g.speed] ? g.speed : 'normal' }));
@@ -935,6 +963,24 @@ function rdSec(role) {
   const e = [['security.protocol', SEC[S.security].proto.toLowerCase()], ['ssl.ca.location', CA, "the CA that signed the brokers' certificates"]];
   if (S.security === 'sasl') e.push(['sasl.mechanisms', 'SCRAM-SHA-512'], ['sasl.username', appUser(role)], ['sasl.password', 'change-me', 'load it from a secret store']);
   return e;
+}
+// Delivery guarantees, as the producer and consumer settings together give them
+const SEMANTICS = {
+  amo: { label: 'At most once', icon: 'bolt', promise: 'Never repeated, but a message can be lost.',
+    hint: 'No retries; the consumer marks a message as read before handling it. For metrics or logs where a gap is fine.' },
+  alo: { label: 'At least once', icon: 'repeat', promise: 'Never lost, but a message can be handled twice.',
+    hint: 'Retries and duplicate prevention; the consumer marks a message as read after handling it. Kafka’s usual choice.' },
+  eos: { label: 'Exactly once', icon: 'shield-check', promise: 'Read, processed and written once, inside Kafka.',
+    hint: 'Transactions: the output and the consumer’s position are saved together, or not at all.' } };
+function semanticOf() {
+  if (S.txn) return 'eos';
+  if (S.acks === '0' || S.retries === '0' || S.commitWhen === 'before') return 'amo';
+  return 'alo';
+}
+// the standard settings for each guarantee
+function applySemantic(v) {
+  const base = { acks: 'all', retries: 'max', idem: true, txn: false, autoCommit: false, commitWhen: 'after' };
+  Object.assign(S, base, { amo: { acks: '1', retries: '0', idem: false, commitWhen: 'before' }, alo: {}, eos: { txn: true } }[v]);
 }
 // How a group shares partitions between its consumers (partition.assignment.strategy)
 const ASSIGN = {
@@ -1059,7 +1105,7 @@ function checks() {
   if (S.acks === '0') w.push({ step: 2, lvl: 'warn', text: 'The producer never hears back, so it cannot retry. Messages are lost without any error when a broker is busy or down.' });
   if (S.acks === '1') w.push({ step: 2, lvl: 'info', text: 'If the leader crashes after confirming but before the followers copy the message, that message is lost.' });
   if (S.maxMsgMB > 1) w.push({ step: 1, lvl: 'info', text: 'Large messages slow down replication and use more memory. For big files, store them elsewhere and send a link.' });
-  if (S.acks !== '0' && S.retries === '0') w.push({ step: 2, lvl: 'warn', text: 'One failed attempt loses the message. Short network blips and leader changes are normal, so let the producer retry.' });
+  if (S.acks !== '0' && S.retries === '0') w.push({ step: 2, lvl: S.commitWhen === 'before' ? 'info' : 'warn', text: 'One failed attempt loses the message. Short network blips and leader changes are normal, so let the producer retry.' });
   if (S.acks !== '0' && S.retries !== '0' && !S.idem && S.maxInFlight > 1) w.push({ step: 2, lvl: 'warn', text: 'A retried batch can land after a newer one, so messages can arrive out of order. Turn on duplicate prevention or allow one request at a time.' });
   if (S.acks === '0' && S.retries !== '0') w.push({ step: 2, lvl: 'info', text: 'Retry settings have no effect with acks=0: the producer never learns that a send failed.' });
   for (const gr of groupList()) {
@@ -1128,7 +1174,7 @@ function consumerFile() {
     'value.deserializer=org.apache.kafka.common.serialization.StringDeserializer', '',
     S.reset === 'earliest' ? '# A new group reads everything still stored' : '# A new group only reads messages sent after it starts',
     `auto.offset.reset=${S.reset}`,
-    S.autoCommit ? '# Mark messages as read automatically every 5 seconds' : '# Your code calls commitSync() after it finishes processing',
+    S.autoCommit ? `# Mark messages as read automatically every ${S.commitEvery} seconds` : S.txn ? '# The position is committed inside each transaction (sendOffsetsToTransaction)' : S.commitWhen === 'before' ? '# At most once: commitSync() right after poll(), before handling' : '# At least once: commitSync() after your code has handled the messages',
     `enable.auto.commit=${S.autoCommit}`];
   if (S.autoCommit) L.push(`auto.commit.interval.ms=${S.commitEvery * 1000}`);
   L.push('', `# Hand your code up to ${S.maxPoll} messages per poll()`, `max.poll.records=${S.maxPoll}`,
@@ -1160,21 +1206,52 @@ function consumerFile() {
   return L.join('\n');
 }
 function loopFile() {
-  const t = topic(), L = [
-    '// ConsumerLoop.java: the read, handle, commit loop that matches consumer.properties',
+  const t = topic(), sem = semanticOf(), head = [
+    `// ConsumerLoop.java: ${SEMANTICS[sem].label.toLowerCase()} (${SEMANTICS[sem].promise.toLowerCase()})`,
     '// imports: java.io.*, java.time.Duration, java.util.*, org.apache.kafka.clients.consumer.*,',
-    '//          org.apache.kafka.clients.producer.*, org.apache.kafka.common.TopicPartition',
+    '//          org.apache.kafka.clients.producer.*, org.apache.kafka.common.*, org.apache.kafka.common.errors.*',
     'Properties props = new Properties();',
     'props.load(new FileInputStream("consumer.properties"));',
     'KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props);'];
+  if (sem === 'eos') return [...head, '',
+    '// Exactly once: read, process and write back in one transaction (consume-transform-produce)',
+    'Properties pp = new Properties();',
+    'pp.load(new FileInputStream("producer.properties"));  // has transactional.id',
+    'KafkaProducer<String, String> producer = new KafkaProducer<>(pp);',
+    'producer.initTransactions();',
+    `consumer.subscribe(List.of("${t}"));`,
+    'while (running) {',
+    '  ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(500));',
+    '  if (records.isEmpty()) continue;',
+    '  producer.beginTransaction();',
+    '  try {',
+    '    Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();',
+    '    for (ConsumerRecord<String, String> r : records) {',
+    `      producer.send(new ProducerRecord<>("${t}.results", r.key(), process(r)));  // your code`,
+    '      offsets.put(new TopicPartition(r.topic(), r.partition()), new OffsetAndMetadata(r.offset() + 1));',
+    '    }',
+    '    // the consumer position is saved in the same transaction as the output',
+    '    producer.sendOffsetsToTransaction(offsets, consumer.groupMetadata());',
+    '    producer.commitTransaction();',
+    '  } catch (ProducerFencedException e) {',
+    '    producer.close();  // a newer instance with the same transactional.id took over: stop',
+    '    break;',
+    '  } catch (KafkaException e) {',
+    '    producer.abortTransaction();  // nothing from this batch becomes visible',
+    '    for (TopicPartition tp : records.partitions()) consumer.seek(tp, records.records(tp).get(0).offset());  // try the batch again',
+    '  }',
+    '}'].join('\n');
+  const L = [...head];
   if (S.onFail === 'dlq') L.push('', '// A producer for failed messages, using producer.properties',
     'Properties pp = new Properties();',
     'pp.load(new FileInputStream("producer.properties"));',
     'KafkaProducer<String, String> dlq = new KafkaProducer<>(pp);');
   L.push('', `consumer.subscribe(List.of("${t}"));`,
     'while (running) {',
-    '  ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(500));',
-    '  for (TopicPartition tp : records.partitions()) {',
+    '  ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(500));');
+  if (sem === 'amo') L.push('  // At most once: mark the batch as read first; a crash while handling loses it, never repeats it',
+    '  if (!records.isEmpty()) consumer.commitSync();');
+  L.push('  for (TopicPartition tp : records.partitions()) {',
     '    for (ConsumerRecord<String, String> r : records.records(tp)) {',
     '      try {',
     '        handle(r);  // your code',
@@ -1182,14 +1259,15 @@ function loopFile() {
   if (S.onFail === 'dlq') L.push(
     '        // Park the message and move on; .get() waits until it is safely stored',
     `        dlq.send(new ProducerRecord<>("${t}.dlq", r.key(), r.value())).get();`);
+  else if (sem === 'amo') L.push('        // At most once: the message is already marked as read, so it is skipped');
   else L.push(
     '        // Read this message again on the next poll and skip the rest of this partition',
     '        consumer.seek(tp, r.offset());',
     '        Thread.sleep(1000);',
     '        break;');
   L.push('      }', '    }', '  }');
-  L.push(S.autoCommit ? '  // enable.auto.commit=true: Kafka marks messages as read in the background'
-    : '  consumer.commitSync();  // mark everything handled so far as read');
+  if (sem !== 'amo') L.push(S.autoCommit ? '  // enable.auto.commit=true: Kafka marks messages as read in the background'
+    : '  consumer.commitSync();  // at least once: mark as read only after handling (a crash before this repeats the batch)');
   L.push('}');
   return L.join('\n');
 }
@@ -1258,6 +1336,9 @@ function setupFile() {
     `bin/kafka-topics.sh --bootstrap-server ${bs}${adm} --create --topic ${topic()} \\`,
     `  --partitions ${S.partitions} --replication-factor ${S.rf} \\`,
     `  --config min.insync.replicas=${S.minIsr} ${S.cleanup === 'compact' ? '--config cleanup.policy=compact' : `--config retention.ms=${S.retention * 86400000}`}${topicExtras()}`,
+    ...(S.txn ? ['', `# 3a. Output topic: exactly-once processing writes its results here`,
+      `bin/kafka-topics.sh --bootstrap-server ${bs}${adm} --create --topic ${topic()}.results \\`,
+      `  --partitions ${S.partitions} --replication-factor ${S.rf} --config min.insync.replicas=${S.minIsr}`] : []),
     ...(S.onFail === 'dlq' ? ['', `# 3b. Dead-letter topic for messages your code could not handle (kept 30 days)`,
       `bin/kafka-topics.sh --bootstrap-server ${bs}${adm} --create --topic ${topic()}.dlq \\`,
       `  --partitions 1 --replication-factor ${S.rf} --config retention.ms=2592000000`] : []),
@@ -1303,20 +1384,51 @@ function pythonFile() {
   const t = topic(), retry = S.onFail === 'retry', d = e => dictLines(e, '"', '    ', '#', ['False', 'True']);
   const L = ['# kafka_client.py: confluent-kafka for Python (pip install confluent-kafka)',
     "# It uses librdkafka, whose setting names are almost the same as Java's.",
-    'from confluent_kafka import Consumer, Producer, TopicPartition', '',
+    'from confluent_kafka import Consumer, KafkaException, Producer, TopicPartition', '',
     'producer = Producer({', ...d(rdProducer()), '})',
     "# produce() raises BufferError at once when its queue is full (Java's max.block.ms",
     '# has no equivalent here): call producer.poll(1) and try again.', '',
     'def on_delivery(err, msg):',
     '    if err:  # called after delivery.timeout.ms when every retry failed',
     '        print(f"Delivery failed: {err}")', '',
-    `producer.produce("${t}", key="${S.keys[0] || 'customer-42'}", value="...", on_delivery=on_delivery)`,
-    'producer.flush()', '',
+    ...(S.txn ? ['producer.init_transactions()', '# Every send happens inside a transaction', 'producer.begin_transaction()',
+      `producer.produce("${t}", key="${S.keys[0] || 'customer-42'}", value="...", on_delivery=on_delivery)`, 'producer.commit_transaction()', '']
+      : [`producer.produce("${t}", key="${S.keys[0] || 'customer-42'}", value="...", on_delivery=on_delivery)`, 'producer.flush()', '']),
     'consumer = Consumer({', ...d(rdConsumer(true)), '})',
     `consumer.subscribe(["${t}"])`, '',
     'while True:',
-    `    batch = consumer.consume(num_messages=${S.maxPoll}, timeout=0.5)  # Java: max.poll.records`,
-    '    handled = 0'];
+    `    batch = consumer.consume(num_messages=${S.maxPoll}, timeout=0.5)  # Java: max.poll.records`];
+  if (S.txn) return [...L,
+    '    batch = [m for m in batch if not m.error()]',
+    '    if not batch:', '        continue',
+    '    # Exactly once: the output and the consumer position are saved in one transaction',
+    '    producer.begin_transaction()',
+    '    try:',
+    '        for m in batch:',
+    `            producer.produce("${t}.results", key=m.key(), value=process(m))  # your code`,
+    '        producer.send_offsets_to_transaction(consumer.position(consumer.assignment()), consumer.consumer_group_metadata())',
+    '        producer.commit_transaction()',
+    '    except KafkaException:',
+    '        producer.abort_transaction()  # nothing from this batch becomes visible',
+    '        first = {}',
+    '        for m in batch:',
+    '            first.setdefault((m.topic(), m.partition()), m.offset())',
+    '        for (tp, part), off in first.items():',
+    '            consumer.seek(TopicPartition(tp, part, off))  # try the batch again'].join('\n');
+  if (semanticOf() === 'amo') return [...L,
+    '    batch = [m for m in batch if not m.error()]',
+    '    # At most once: mark the batch as read first; a crash while handling loses it, never repeats it',
+    '    last = {}',
+    '    for m in batch:',
+    '        last[(m.topic(), m.partition())] = m.offset() + 1',
+    '    if last:',
+    '        consumer.commit(offsets=[TopicPartition(tp, part, off) for (tp, part), off in last.items()], asynchronous=False)',
+    '    for m in batch:',
+    '        try:',
+    '            handle(m)  # your code',
+    '        except Exception as e:',
+    '            print(f"Skipped (at most once): {e}")'].join('\n');
+  L.push('    handled = 0');
   if (retry) L.push('    failed = set()');
   L.push('    for m in batch:', '        if m.error():', '            continue');
   if (retry) L.push('        if (m.topic(), m.partition()) in failed:', '            continue  # the failed message must succeed first');
@@ -1331,23 +1443,36 @@ function pythonFile() {
   return L.join('\n');
 }
 function nodeFile() {
-  const t = topic(), d = e => dictLines(e, "'", '  ', '//', ['false', 'true']);
-  return ['// kafka-client.js: Confluent JavaScript client (npm install @confluentinc/kafka-javascript)',
+  const t = topic(), sem = semanticOf(), d = e => dictLines(e, "'", '  ', '//', ['false', 'true']), key = S.keys[0] || 'customer-42';
+  const L = ['// kafka-client.js: Confluent JavaScript client (npm install @confluentinc/kafka-javascript)',
     "// It uses librdkafka, whose setting names are almost the same as Java's.",
+    `// Delivery guarantee: ${SEMANTICS[sem].label.toLowerCase()} (${SEMANTICS[sem].promise.toLowerCase()})`,
     "const { Kafka } = require('@confluentinc/kafka-javascript').KafkaJS;", '',
     'const kafka = new Kafka({});',
     'const producer = kafka.producer({', ...d(rdProducer()), '});', '',
     'const consumer = kafka.consumer({', ...d(rdConsumer(false)), '});', '',
     'async function main() {',
-    '  await producer.connect();',
-    `  await producer.send({ topic: '${t}', messages: [{ key: '${S.keys[0] || 'customer-42'}', value: '...' }] });`,
-    '  await consumer.connect();',
-    `  await consumer.subscribe({ topics: ['${t}'] });`,
-    '  await consumer.run({',
-    '    eachMessage: async ({ message }) => {',
-    S.onFail === 'dlq' ? `      try { await handle(message); }  // your code
-      catch (e) { await producer.send({ topic: '${t}.dlq', messages: [message] }); }` : '      await handle(message);  // your code',
-    '    },', '  });', '}', 'main();'].join('\n');
+    '  await producer.connect();'];
+  if (sem === 'eos') L.push('  // Every send happens inside a transaction', '  const first = await producer.transaction();',
+    `  await first.send({ topic: '${t}', messages: [{ key: '${key}', value: '...' }] });`, '  await first.commit();');
+  else L.push(`  await producer.send({ topic: '${t}', messages: [{ key: '${key}', value: '...' }] });`);
+  L.push('  await consumer.connect();', `  await consumer.subscribe({ topics: ['${t}'] });`, '  await consumer.run({',
+    '    eachMessage: async ({ topic, partition, message }) => {');
+  if (sem === 'eos') L.push('      // Exactly once: the output and the consumer position are saved in one transaction',
+    '      const tx = await producer.transaction();',
+    '      try {',
+    `        await tx.send({ topic: '${t}.results', messages: [{ key: message.key, value: process(message) }] });  // your code`,
+    '        await tx.sendOffsets({ consumer, topics: [{ topic, partitions: [{ partition, offset: String(Number(message.offset) + 1) }] }] });',
+    '        await tx.commit();',
+    '      } catch (e) { await tx.abort(); throw e; }  // throwing makes the client read the message again');
+  else {
+    if (sem === 'amo') L.push('      // At most once: mark it as read before handling it',
+      '      await consumer.commitOffsets([{ topic, partition, offset: String(Number(message.offset) + 1) }]);');
+    L.push(S.onFail === 'dlq' && sem !== 'amo' ? `      try { await handle(message); }  // your code
+      catch (e) { await producer.send({ topic: '${t}.dlq', messages: [message] }); }` : sem === 'amo' ? '      try { await handle(message); } catch (e) { console.log("skipped (at most once)", e); }  // your code' : '      await handle(message);  // your code');
+  }
+  L.push('    },', '  });', '}', 'main();');
+  return L.join('\n');
 }
 function goFile() {
   const d = e => dictLines(e, '"', '\t\t', '//', ['false', 'true']);
@@ -1357,6 +1482,10 @@ function goFile() {
     'func newProducer() (*kafka.Producer, error) {', '\treturn kafka.NewProducer(&kafka.ConfigMap{', ...d(rdProducer()), '\t})', '}', '',
     'func newConsumer() (*kafka.Consumer, error) {', '\treturn kafka.NewConsumer(&kafka.ConfigMap{', ...d(rdConsumer(true)), '\t})', '}', '',
     '// Read loop: msg, err := c.ReadMessage(500 * time.Millisecond)',
+    ...({ eos: ['// Exactly once: p.InitTransactions(ctx) once; per batch p.BeginTransaction(), produce the results,',
+      '// p.SendOffsetsToTransaction(ctx, positions, c.GetConsumerGroupMetadata()), then p.CommitTransaction(ctx).',
+      '// On error p.AbortTransaction(ctx) and seek back to the start of the batch.'],
+      amo: ['// At most once: c.CommitMessage(msg) first, then handle(msg). A crash while handling loses it.'], alo: [] }[semanticOf()]),
     `// After handle(msg) succeeds, call c.StoreMessage(msg)${S.autoCommit ? '; auto commit saves it in the background.' : ', then c.Commit() to mark it read.'}`,
     S.onFail === 'dlq' ? `// If it fails, produce it to "${topic()}.dlq" and store it anyway.` : '// If it fails, c.Seek() back to msg.TopicPartition and try again.'].join('\n');
 }
@@ -1383,7 +1512,9 @@ function springFile() {
     `        partition.assignment.strategy: org.apache.kafka.clients.consumer.${ASSIGN[S.assign].java}`,
     ...(S.txn ? ['        isolation.level: read_committed'] : []), ...(S.staticMember ? [`        group.instance.id: ${group()}-1  # unique per instance`] : []),
     ...(S.racks ? ['        client.rack: zone-1'] : []));
-  if (!S.autoCommit) L.push('    listener:', '      # Commit after your @KafkaListener has handled each poll\'s messages', '      ack-mode: batch');
+  if (!S.autoCommit) L.push('    listener:', S.txn ? '      # Exactly once: with transaction-id-prefix set, the listener commits offsets inside each transaction'
+    : semanticOf() === 'amo' ? '      # At most once: use ack-mode manual_immediate and call ack.acknowledge() before handling'
+    : '      # Commit after your @KafkaListener has handled each poll\'s messages', `      ack-mode: ${semanticOf() === 'amo' ? 'manual_immediate' : 'batch'}`);
   L.push('', '# Failed messages: add this bean to a @Configuration class.',
     '# @Bean', '# DefaultErrorHandler errorHandler(KafkaTemplate<Object, Object> template) {');
   if (S.onFail === 'dlq') L.push('#   return new DefaultErrorHandler(', '#     new DeadLetterPublishingRecoverer(template,',
@@ -1608,10 +1739,9 @@ function importConfig(txt) {
   save();
   return R;
 }
-function importReportHtml() {
-  if (!importReport) return '';
-  const R = importReport;
-  return `<div class="report" id="import-report" tabindex="-1">
+function importReportHtml(R = importReport, rid = 'import-report') {
+  if (!R) return '';
+  return `<div class="report" id="${rid}" tabindex="-1">
     <h4>${R.shared ? 'Loaded a shared setup. The diagram and every step now use it.' : R.applied.length ? `Loaded ${pl(R.applied.length, 'setting')}. The diagram and every step now use them.` : 'No settings Kafka Pilot knows were found.'}</h4>
     ${R.problems.length ? `<div class="notes">${R.problems.map(t => `<div class="note warn">${ICON.warn}<div><span class="sr">Problem: </span>${t}</div></div>`).join('')}</div>` : (R.applied.length ? `<div class="note ok">${ICON.ok}<div>No combinations that Kafka rejects.</div></div>` : '')}
     ${R.rounded.length ? `<div><b>Adjusted to fit</b><ul>${R.rounded.map(x => `<li>${x}</li>`).join('')}</ul></div>` : ''}
@@ -1673,13 +1803,90 @@ function delGroup(i) {
   lagHist.splice(i + 1, 1);
   normalize(); save(); renderAll(); announce(`Removed group ${name}.`);
 }
+// Side by side: what each guarantee promises, what a crash does, the settings, and the standard code
+let semOpen = false, semLang = 'java';
+const SEMCODE = {
+  java: {
+    amo: `records = consumer.poll(timeout);
+consumer.commitSync();             // 1. mark as read
+for (var r : records) handle(r);   // 2. then handle`,
+    alo: `records = consumer.poll(timeout);
+for (var r : records) handle(r);   // 1. handle (safe to repeat)
+consumer.commitSync();             // 2. then mark as read`,
+    eos: `producer.initTransactions();
+records = consumer.poll(timeout);
+producer.beginTransaction();
+for (var r : records)
+  producer.send(new ProducerRecord<>(OUT, r.key(), process(r)));
+producer.sendOffsetsToTransaction(offsets(records),
+    consumer.groupMetadata());
+producer.commitTransaction();      // output + position together` },
+  python: {
+    amo: `batch = consumer.consume(500, 0.5)
+consumer.commit(offsets=next_offsets(batch),
+                asynchronous=False)   # 1. mark as read
+for m in batch: handle(m)             # 2. then handle`,
+    alo: `batch = consumer.consume(500, 0.5)
+for m in batch: handle(m)             # 1. handle (safe to repeat)
+consumer.commit(asynchronous=False)   # 2. then mark as read`,
+    eos: `producer.init_transactions()
+batch = consumer.consume(500, 0.5)
+producer.begin_transaction()
+for m in batch:
+    producer.produce(OUT, key=m.key(), value=process(m))
+producer.send_offsets_to_transaction(
+    consumer.position(consumer.assignment()),
+    consumer.consumer_group_metadata())
+producer.commit_transaction()         # output + position together` } };
+const SEMINFO = {
+  amo: { crash: 'Crash after marking, before handling: that batch is never handled. Nothing is ever handled twice.',
+    cfg: ['acks=1 (or 0)', 'retries=0', 'enable.idempotence=false', 'enable.auto.commit=false', 'commit before handling'] },
+  alo: { crash: 'Crash after handling, before marking: the batch is handled again after restart. Make handling safe to repeat (idempotent).',
+    cfg: ['acks=all', 'retries=MAX', 'enable.idempotence=true', 'enable.auto.commit=false', 'commit after handling'] },
+  eos: { crash: 'Crash mid-transaction: Kafka aborts it, the output disappears and the position is unchanged, so the batch runs again with no duplicates. Effects outside Kafka (emails, database writes) still need idempotent handling.',
+    cfg: ['acks=all, enable.idempotence=true', 'transactional.id (unique per instance)', 'isolation.level=read_committed', 'enable.auto.commit=false', 'sendOffsetsToTransaction'] } };
+function semPanel() {
+  const cur = semanticOf();
+  return `<div class="sempanel" id="sem-panel">
+    <div class="semtabs" role="group" aria-label="Code language">${['java', 'python'].map(l => `<button type="button" class="link-btn" data-semlang="${l}" data-tip="sem-lang" aria-pressed="${semLang === l}">${l === 'java' ? 'Java' : 'Python'}</button>`).join('')}</div>
+    <div class="semcols">${Object.entries(SEMANTICS).map(([k, x]) => `<section class="semcol${k === cur ? ' current' : ''}" aria-label="${x.label}">
+      <h4>${ic(x.icon, 18)}${x.label}${k === cur ? '<span class="semnow">your setup</span>' : ''}</h4>
+      <p class="sempromise">${x.promise}</p>
+      <p class="semcrash"><b>If the consumer crashes:</b> ${SEMINFO[k].crash}</p>
+      <ul class="semcfg">${SEMINFO[k].cfg.map(c => `<li><code>${esc(c)}</code></li>`).join('')}</ul>
+      <pre class="semcode">${esc(SEMCODE[semLang][k])}</pre>
+      ${k === cur ? '' : `<button type="button" class="btn" data-semuse="${k}" data-tip="sem-use:${k}">${ic('check')}Use ${x.label.toLowerCase()}</button>`}
+    </section>`).join('')}</div>
+    <p class="help after">Kafka Streams apps get exactly once with one setting: <code class="key">processing.guarantee=exactly_once_v2</code>.</p></div>`;
+}
 const intro = (h, p) => `<div class="intro"><h2 id="step-h" tabindex="-1">${h}</h2><p>${p}</p></div>`;
 
+// Each part can take its own config: paste server.properties on Cluster, producer.properties on Producer, consumer.properties on Consumer
+const PASTE = { cluster: ['server.properties', 'num.partitions=6\ndefault.replication.factor=3\nmin.insync.replicas=2'],
+  producer: ['producer.properties', 'acks=all\nenable.idempotence=true\nlinger.ms=10'],
+  consumer: ['consumer.properties', 'group.id=orders-service\nenable.auto.commit=false\nmax.poll.records=500'] };
+const pasteText = {}, pasteReport = {};
+function pasteBox(part) {
+  const [file, ph] = PASTE[part];
+  return `<details class="sub pastebox"${pasteText[part] || pasteReport[part] ? ' open' : ''}><summary>${ic('file-import')}Paste your ${file}</summary>
+    <div class="q"><label class="qlabel" for="paste-${part}">Your ${file} (or the matching part of a Spring application.yml or KAFKA_ variables)</label>
+    <textarea class="field" id="paste-${part}" data-paste="${part}" ${rawTip(`Paste ${file}`, `Paste your own ${file}. Load and check fills in this step from it and points out values Kafka rejects or that lose data.`)} spellcheck="false" autocomplete="off" placeholder="${ph}">${esc(pasteText[part] || '')}</textarea>
+    <div class="actions"><button type="button" class="btn primary" data-pasteload="${part}" ${rawTip('Load and check', `Reads the pasted ${file} into every step and checks it.`)}>${ic('file-import')}Load and check</button></div>
+    ${importReportHtml(pasteReport[part], `paste-report-${part}`)}</div></details>`;
+}
 function controlsHtml() {
+  const id = STEPS[step].id;
+  return controlsBody() + (PASTE[id] ? pasteBox(id) : '');
+}
+function controlsBody() {
   const id = STEPS[step].id;
   if (id === 'goal') return intro('What is this topic for?', 'Pick the closest match. It fills in sensible settings for every step, and you can change any of them later.') +
     choice('goal', 'Kind of data', '', Object.entries(PRESETS).map(([v, p]) => ({ v, label: p.label, hint: p.hint, icon: { starter: 'route', safe: 'shield-check', payments: 'credit-card', balanced: 'scale', bulk: 'stack-2', fast: 'bolt', jobs: 'list-check', iot: 'cpu', cdc: 'database', audit: 'history' }[v] }))) +
     (isCustom() ? `<div class="note info">${ICON.info}<div>You changed some settings after picking “${PRESETS[S.goal].label}”. Pick it again to reset them.</div></div>` : '') +
+    choice('semantic', 'What delivery guarantee do you need?', '', Object.entries(SEMANTICS).map(([v, x]) => ({ v, icon: x.icon, label: x.label, hint: x.promise })),
+      'Choosing one sets the producer and consumer settings that give it. Change those later and this shows what you have.') +
+    `<div class="semtoggle"><button type="button" class="btn" id="sem-open" data-tip="sem-open" aria-expanded="${semOpen}" aria-controls="sem-panel">${ic('list')}${semOpen ? 'Hide' : 'Show'} how each guarantee is implemented</button></div>` +
+    (semOpen ? semPanel() : '') +
     `<div class="row2">${text('topic', 'Topic name', '', 'Lowercase words with dashes or dots work best.')}
       ${text('host', 'Broker host name prefix', '', `Brokers will be named ${esc(hostPrefix())}1, ${esc(hostPrefix())}2 and so on.`)}</div>` +
     `<div class="sub"><h3>Already have a config?</h3>
@@ -1781,6 +1988,9 @@ function controlsHtml() {
     `<label class="switch q" ${rawTip('Static membership', 'Give each consumer a fixed name. When it restarts, for example during a deploy, it gets the same partitions back without a rebalance, as long as it returns within the session timeout.')}><input type="checkbox" id="staticMember" data-k="staticMember"${S.staticMember ? ' checked' : ''}>
       <span class="txt"><span class="qlabel">Keep partitions through restarts${key('group.instance.id')}</span>
       <span class="help">A consumer that restarts within ${S.sessionTimeout} s gets its partitions back with no rebalance. Each instance needs its own name.</span></span></label>` +
+    (S.autoCommit || S.txn ? '' : choice('commitWhen', 'When does your code mark a message as read?', 'commitSync()', [
+      { v: 'after', label: 'After handling it', hint: 'At least once: a crash repeats it, never loses it.' },
+      { v: 'before', label: 'Before handling it', hint: 'At most once: a crash loses it, never repeats it.' }])) +
     choice('reset', 'Where should a new group start reading?', 'auto.offset.reset', [
       { v: 'earliest', label: 'From the beginning', hint: 'Read everything still stored' },
       { v: 'latest', label: 'From now on', hint: 'Only messages sent after it starts' }]) +
@@ -1957,7 +2167,7 @@ function geom() {
   const rowH = Math.min(40, Math.max(multi ? 34 : 30, 340 / P));
   // each group's box: name, settings row, then its consumers; 12px gap between boxes
   const blockH = gs.map(g => g.consumers * 40 + 62), consH = blockH.reduce((a, b) => a + b, 0);
-  const bodyH = Math.max(P * rowH, consH, N * 52 + 104, 140);
+  const bodyH = Math.max(P * rowH, consH, N * 52 + 236, 140);  // room for the producers and the acks panel below them
   const gy0 = []; blockH.reduce((y, h) => { gy0.push(y); return y + h; }, top);  // anchored at the top: a box's buttons stay put while it grows
   SLOTS = multi ? 11 : 12;
   const tx = 262, sw = 25, tEnd = tx + SLOTS * sw, rx = tEnd + (multi ? 84 : 58);
@@ -2148,13 +2358,17 @@ function drawMap() {
   s += `</g><g class="zone z-p"><g class="partbtn" data-fid="part" data-tip="part" role="button" tabindex="0" aria-label="Partitioner, hash % ${P}. Show what it means">
     <rect class="part-n" x="${G.qx - 37}" y="${G.py - 16}" width="74" height="32" rx="8"/>
     <text class="pn" x="${G.qx}" y="${G.py + 4}" aria-hidden="true">hash % ${P}</text></g></g>`;
-  // acks can be changed right here: three switches under the producers
-  const ay = G.prodY(G.N - 1) + 40;
-  s += `<g class="zone z-p" data-fid="acks"><text class="muted" x="${G.px}" y="${ay}" text-anchor="middle" aria-hidden="true">acks</text>`;
-  ['0', '1', 'all'].forEach((v, k) => {
-    const x = G.px - 40 + k * 27, on = S.acks === v;
-    s += `<g class="ackseg${on ? ' on' : ''}" data-acks="${v}" data-tip="acks:${v}" role="button" tabindex="0" aria-pressed="${on}" aria-label="Producer acks=${v}">
-      <rect x="${x}" y="${ay + 7}" width="26" height="24" rx="6"/><text x="${x + 13}" y="${ay + 23}" text-anchor="middle">${v}</text></g>`;
+  // acks, right under the producers: what the producer waits for before it moves on
+  const ay = G.prodY(G.N - 1) + 34, ax = 12, aw = 178;
+  const need = { '0': 0, '1': 1, all: Math.max(1, S.minIsr) };
+  s += `<g class="zone z-p" data-fid="acks"><rect class="ackpanel" x="${ax - 4}" y="${ay}" width="${aw + 8}" height="114" rx="10"/>
+    <text class="acktitle" x="${ax + 4}" y="${ay + 17}" aria-hidden="true">acks · wait for</text>`;
+  [['0', 'nothing', 'fastest, may lose'], ['1', 'the leader', 'lost if it crashes'], ['all', S.minIsr > 1 ? `${S.minIsr} in-sync copies` : 'every in-sync copy', 'safest']].forEach(([v, what, note], k) => {
+    const y = ay + 26 + k * 28, on = S.acks === v;
+    s += `<g class="ackseg${on ? ' on' : ''}" data-acks="${v}" data-tip="acks:${v}" role="button" tabindex="0" aria-pressed="${on}" aria-label="Producer acks=${v}: wait for ${what}">
+      <rect x="${ax}" y="${y}" width="${aw}" height="24" rx="6"/>
+      <text class="ackv" x="${ax + 10}" y="${y + 16}">${v}</text><text class="ackw" x="${ax + 40}" y="${y + 16}">${what}</text>
+      ${Array.from({ length: Math.min(need[v], 3) }, (_, i) => `<circle class="ackdot" cx="${ax + aw - 12 - i * 9}" cy="${y + 12}" r="3"/>`).join('')}</g>`;
   });
   s += '</g>';
   // brokers: one switch per broker, with how many partitions it leads
@@ -2656,6 +2870,9 @@ function tipText(key) {
     case 'delkey': return ['Remove key', 'Removes this key from the examples.'];
     case 'lane': return [['Your apps · write', 'Kafka cluster · store', 'Your services · read'][n], 'Scrolls the diagram to this section.'];
     case 'kafka': return ['Apache Kafka', 'Opens kafka.apache.org, the home of Apache Kafka: documentation, downloads and the community. Kafka Pilot is an independent tool, not part of the Apache project.'];
+    case 'sem-open': return ['Delivery guarantees', 'Compare at most once, at least once and exactly once: what each promises, what a crash does, the settings and the standard code.'];
+    case 'sem-lang': return ['Code language', 'Show the standard code patterns in Java or Python.'];
+    case 'sem-use': return SEMANTICS[a] ? [`Use ${SEMANTICS[a].label.toLowerCase()}`, `Applies the standard settings: ${SEMINFO[a].cfg.join(', ')}.`] : null;
     case 'chal': return ['Challenges', 'Short missions: each sets up a problem and checks your fix live, then explains why it works.'];
     case 'chal-start': { const c = CHALLENGES.find(x => x.id === a); return c ? [c.title, `Start this challenge. It replaces the current setup with the problem. ${c.intro}`] : null; }
     case 'chal-hint': return ['Hint', 'Shows which controls to change, without changing them for you.'];
@@ -2858,6 +3075,7 @@ function set(k, v, light) {
   else if (typeof S[k] === 'boolean') v = v === true || v === 'true';
   S[k] = v;
   if (k === 'goal') PKEYS.forEach(p => { S[p] = PRESETS[v][p]; });
+  if (k === 'semantic') applySemantic(v);
   normalize(); save();
   if (light) { renderNav(); drawMap(); renderSide(); }
   else { renderNav(); renderControls(); drawMap(); renderSide(); }
@@ -2884,6 +3102,7 @@ controls.addEventListener('keydown', e => {
 controls.addEventListener('input', e => {
   const el = e.target, k = el.dataset.k;
   if (el.id === 'importText') { importText = el.value; return; }
+  if (el.dataset.paste) { pasteText[el.dataset.paste] = el.value; return; }
   if (el.dataset.gname !== undefined) { S.more[+el.dataset.gname].name = el.value.slice(0, 60); save(); renderNav(); renderSide(); drawMap(); return; }
   if (el.dataset.gspeed !== undefined) { S.more[+el.dataset.gspeed].speed = el.value; save(); lagHist.length = 0; renderNav(); renderSide(); drawMap(); return; }
   if (!k) return;
@@ -2898,6 +3117,17 @@ controls.addEventListener('input', e => {
   else if (el.type === 'radio') set(k, el.value);
 });
 document.addEventListener('click', e => {
+  const pl_ = e.target.closest('[data-pasteload]');
+  if (pl_) {
+    const part = pl_.dataset.pasteload;
+    pasteReport[part] = importConfig(pasteText[part] || '');
+    renderAll();
+    const r = $(`paste-report-${part}`); r && r.focus();
+    return;
+  }
+  if (e.target.closest('#sem-open')) { semOpen = !semOpen; renderControls(); $('sem-open').focus(); return; }
+  const sl = e.target.closest('[data-semlang]'); if (sl) { semLang = sl.dataset.semlang; renderControls(); const b = document.querySelector(`[data-semlang="${semLang}"]`); b && b.focus(); return; }
+  const su = e.target.closest('[data-semuse]'); if (su) { set('semantic', su.dataset.semuse); announce(`Now using ${SEMANTICS[su.dataset.semuse].label.toLowerCase()}.`); const b = $('sem-open'); b && b.focus(); return; }
   const gst = e.target.closest('[data-gstep]');
   if (gst) { const gr = S.more[+gst.dataset.gstep]; gr.consumers = clamp(gr.consumers + Number(gst.dataset.d), 1, 8); normalize(); save(); renderAll(); return; }
   if (e.target.closest('[data-gadd]')) { addGroup(); const f = $(`gname-${S.more.length - 1}`); f && f.focus(); return; }

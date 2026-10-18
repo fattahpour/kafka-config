@@ -293,6 +293,65 @@ test('new settings: transactions, static membership, zones, size limit, buffer, 
   noErrors(page); await page.context().close();
 });
 
+test('delivery guarantees: each applies standard settings, code and a comparison', async () => {
+  const page = await open();
+  const pick = async v => { await page.click('.steps button[data-goto="0"]'); await page.click(`input[name="semantic"][value="${v}"]`, { force: true }); await page.waitForTimeout(80); return page.evaluate(() => ({ S: window.__kp.S(), f: window.__kp.files() })); };
+  let { S, f } = await pick('amo');
+  assert(S.acks === '1' && S.retries === '0' && S.commitWhen === 'before' && !S.txn, 'at most once settings: ' + JSON.stringify([S.acks, S.retries, S.commitWhen]));
+  const loop = f['ConsumerLoop.java'];
+  assert(loop.indexOf('consumer.commitSync()') < loop.indexOf('handle(r)'), 'at most once must commit before handling');
+  assert(f['kafka_client.py'].includes('consumer.commit(offsets='), 'python at most once commits first');
+  ({ S, f } = await pick('alo'));
+  assert(S.acks === 'all' && S.idem && S.commitWhen === 'after' && !S.txn, 'at least once settings');
+  assert(f['ConsumerLoop.java'].indexOf('handle(r)') < f['ConsumerLoop.java'].lastIndexOf('consumer.commitSync()'), 'at least once must commit after handling');
+  ({ S, f } = await pick('eos'));
+  assert(S.txn && S.idem && S.acks === 'all', 'exactly once settings');
+  for (const [n, x] of [['ConsumerLoop.java', 'sendOffsetsToTransaction'], ['kafka_client.py', 'send_offsets_to_transaction'], ['kafka-client.js', 'tx.sendOffsets'],
+    ['kafka_client.go', 'SendOffsetsToTransaction'], ['consumer.properties', 'isolation.level=read_committed'], ['setup.sh', '--topic orders.results']])
+    assert(f[n].includes(x), `exactly once: ${n} lacks ${x}`);
+  // comparison panel: three columns, the current one marked, language switch, and "use" buttons
+  await page.click('#sem-open');
+  assert((await page.$$('.semcol')).length === 3, 'comparison should show three guarantees');
+  assert(await page.$eval('.semcol.current h4', h => h.textContent.includes('Exactly once')), 'current guarantee not marked');
+  await page.click('[data-semlang="python"]');
+  assert((await page.textContent('.semcol.current .semcode')).includes('send_offsets_to_transaction'), 'python code not shown');
+  await page.click('[data-semuse="alo"]');
+  assert(await page.evaluate(() => window.__kp.S().semantic) === 'alo', 'use button did not apply at least once');
+  noErrors(page); await page.context().close();
+});
+
+test('each part takes its own pasted config; acks panel switches acks', async () => {
+  const page = await open();
+  for (const [st, part, text, check] of [[1, 'cluster', 'num.partitions=4\ndefault.replication.factor=1', s => s.partitions === 4],
+    [2, 'producer', 'acks=1\nlinger.ms=30', s => s.acks === '1' && s.linger === 30],
+    [3, 'consumer', 'max.poll.records=250\nenable.auto.commit=true', s => s.maxPoll === 250 && s.autoCommit === true]]) {
+    await page.click(`.steps button[data-goto="${st}"]`); await page.waitForTimeout(150);
+    await page.click('.pastebox summary'); await page.fill(`#paste-${part}`, text); await page.click(`[data-pasteload="${part}"]`); await page.waitForTimeout(150);
+    assert(check(await page.evaluate(() => window.__kp.S())), `${part}: pasted settings not applied`);
+    assert(await page.$(`#paste-report-${part}`), `${part}: no report`);
+  }
+  await page.click('.steps button[data-goto="0"]');
+  await page.click('.ackseg[data-acks="0"]'); assert(await page.evaluate(() => window.__kp.S().acks) === '0', 'acks panel did not set 0');
+  await page.click('.ackseg[data-acks="all"]'); assert(await page.evaluate(() => window.__kp.S().acks) === 'all', 'acks panel did not set all');
+  noErrors(page); await page.context().close();
+});
+
+test('generated JavaScript and Python are valid code for every kind and guarantee', async () => {
+  const page = await open();
+  const { execFileSync } = require('child_process');
+  const goals = await page.$$eval('input[name="goal"]', a => a.map(i => i.value)), bad = [];
+  for (const g of goals) for (const sem of ['amo', 'alo', 'eos']) {
+    await page.click('.steps button[data-goto="0"]');
+    await page.click(`input[name="goal"][value="${g}"]`, { force: true }); await page.click(`input[name="semantic"][value="${sem}"]`, { force: true });
+    const f = await page.evaluate(() => window.__kp.files());
+    fs.writeFileSync(path.join(OUT, 'chk.js'), f['kafka-client.js']); fs.writeFileSync(path.join(OUT, 'chk.py'), f['kafka_client.py']);
+    try { execFileSync(process.execPath, ['--check', path.join(OUT, 'chk.js')], { stdio: 'pipe' }); } catch (e) { bad.push(`${g}/${sem} kafka-client.js: ${String(e.stderr).split('\n').slice(0, 4).join(' ')}`); }
+    try { execFileSync('/usr/bin/python3', ['-I', '-c', 'import sys; compile(open(sys.argv[1]).read(), "py", "exec")', path.join(OUT, 'chk.py')], { stdio: 'pipe' }); } catch (e) { bad.push(`${g}/${sem} kafka_client.py: ${String(e.stderr).trim().split('\n').pop()}`); }
+  }
+  assert(!bad.length, bad.slice(0, 4).join(' | '));
+  noErrors(page); await page.context().close();
+});
+
 test('theme switch cycles and is remembered', async () => {
   const page = await open();
   const theme = () => page.evaluate(() => document.documentElement.getAttribute('data-theme') || 'auto');

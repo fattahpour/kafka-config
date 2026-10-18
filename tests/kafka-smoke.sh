@@ -135,6 +135,15 @@ echo "$PYTX" | grep -q "PYTX \['committed-0', 'committed-1', 'committed-2'\]" \
   && pass "a transaction commits 3 messages, an aborted one stays invisible to read_committed; static membership and client.rack accepted" \
   || fail "transactions: $(echo "$PYTX" | tail -3)"
 
+echo "exactly once end to end: the generated Python loop"
+RES=$(grep -A2 '# 3a. Output topic' "$OUT/pay/setup.sh" | tail -2 | tr -d '\\\n' | sed 's#bin/##; s#kafka1:9092#kafka1:9092#')
+eval "K kafka1 $RES" >/dev/null 2>&1
+{ echo 'def process(m): return m.value()'; sed "s/\"group.id\": \"[^\"]*\"/\"group.id\": \"eos-check\"/" "$OUT/pay/kafka_client.py"; } > "$OUT/pay/py_eos.py"
+docker run --rm --network "$NET" -v "$PWD/$OUT/pay:/w" python:3.12-slim sh -c "pip install -q confluent-kafka >/dev/null 2>&1 && timeout 45 python /w/py_eos.py" >/dev/null 2>&1
+CNT() { K kafka1 kafka-console-consumer.sh --bootstrap-server kafka1:9092 --topic "$1" --from-beginning --isolation-level read_committed --timeout-ms 15000 2>/dev/null | wc -l; }
+IN=$(CNT orders); OUTN=$(CNT orders.results)
+[ "$IN" -gt 0 ] && [ "$IN" = "$OUTN" ] && pass "every one of $IN input messages produced exactly one committed result ($OUTN)" || fail "exactly once: $IN in, $OUTN results"
+
 echo "a broker goes down"
 K kafka1 kafka-topics.sh --bootstrap-server kafka1:9092 --create --topic strict --partitions 1 --replication-factor 3 --config min.insync.replicas=3 >/dev/null 2>&1
 $DC stop kafka3 >/dev/null 2>&1; sleep 8
