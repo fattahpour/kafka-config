@@ -4,10 +4,13 @@
   "description": "Interactive Kafka producer, broker and consumer configuration guide",
   "scripts": {
     "test": "node tests/run.js",
-    "test:kafka": "bash tests/kafka-smoke.sh"
+    "test:kafka": "bash tests/kafka-smoke.sh",
+    "build": "node scripts/build.js",
+    "deploy:artifactory": "bash scripts/deploy-artifactory.sh"
   },
   "devDependencies": {
     "darkreader": "^4.9.133",
     "playwright-core": "1.58.2"
-  }
+  },
+  "version": "1.0.0"
 }
