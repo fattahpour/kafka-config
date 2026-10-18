@@ -1,9 +1,9 @@
-<title>Kafka Pilot</title>
+<title>Kafka Config</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="color-scheme" content="light dark">
 <script>
 /* Dark Reader repaints every page unless it finds a darkreader-lock meta in <head> (it only watches <head>).
-   Kafka Pilot has its own dark theme, so it locks Dark Reader out, and if Dark Reader was on, it switches to
+   Kafka Config has its own dark theme, so it locks Dark Reader out, and if Dark Reader was on, it switches to
    that theme instead. A theme the person picked with the page's own switch always wins. */
 (function () {
   var d = document, root = d.documentElement, pick = null;
@@ -649,7 +649,7 @@ textarea.field { max-width: none; min-height: 150px; font-family: var(--mono); f
         <circle cx="24" cy="22" r="3.6" fill="var(--surface)" stroke="var(--broker)" stroke-width="2.6"/>
         <circle cx="29" cy="30" r="3.6" fill="var(--surface)" stroke="var(--consumer)" stroke-width="2.6"/>
       </svg>
-      <h1>Kafka Pilot</h1>
+      <h1>Kafka Config</h1>
       <button type="button" class="theme-btn" id="theme" data-tip="theme"></button>
     </div>
     <nav class="steps" aria-label="Setup steps"><p class="side-label">Setup</p><span class="rail" id="rail" aria-hidden="true"></span><ol id="steps"></ol></nav>
@@ -661,11 +661,11 @@ textarea.field { max-width: none; min-height: 150px; font-family: var(--mono); f
 
   <main class="main" id="main">
     <header class="top">
-      <p class="crumb"><span>Kafka Pilot</span><span class="sep" aria-hidden="true">/</span><span id="crumb-step"></span><span class="pill" id="crumb-pill"><i aria-hidden="true"></i><span></span></span><button type="button" class="link-btn sharebtn" id="share" data-tip="share" aria-expanded="false" aria-controls="sharebox"></button></p>
+      <p class="crumb"><span>Kafka Config</span><span class="sep" aria-hidden="true">/</span><span id="crumb-step"></span><span class="pill" id="crumb-pill"><i aria-hidden="true"></i><span></span></span><button type="button" class="link-btn sharebtn" id="share" data-tip="share" aria-expanded="false" aria-controls="sharebox"></button></p>
       <p class="lede">Configure Kafka in five plain questions. <span>See it, then copy it.</span></p>
       <p class="sub-lede">Answer a few questions about your topic. Watch the diagram change, then copy working producer, broker and consumer configs.</p>
       <div class="sharebox" id="sharebox" hidden>
-        <p><b>Share this setup.</b> The link opens Kafka Pilot with these answers. If it opens without them, because some sites drop the part after #, paste the code into <em>Import</em> on the Goal step.</p>
+        <p><b>Share this setup.</b> The link opens Kafka Config with these answers. If it opens without them, because some sites drop the part after #, paste the code into <em>Import</em> on the Goal step.</p>
         <div class="sharerow"><label for="share-link">Link</label><input class="field" id="share-link" readonly data-tip="share-link"><button type="button" class="btn" data-copyshare="link" data-tip="share-copy-link"></button></div>
         <div class="sharerow"><label for="share-code">Code</label><input class="field" id="share-code" readonly data-tip="share-code"><button type="button" class="btn" data-copyshare="code" data-tip="share-copy-code"></button></div>
       </div>
@@ -711,7 +711,7 @@ textarea.field { max-width: none; min-height: 150px; font-family: var(--mono); f
     </div>
     <footer class="foot">
       <a class="kafkalink kl-foot" href="https://kafka.apache.org/" target="_blank" rel="noopener" data-tip="kafka"><span class="kplate"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHUAAABBCAYAAADv7+sHAAAMaElEQVR42u1deYxkRRmf7hkVNeLFujjT/V69o7tXB4m60XhFRkVEUFBgFUGDURSPqIlHonjHK2oEFYIQ3YXgEcU7KIkHh8YIHusJHngb/UdhdMDdnVlmZ/x+Pd8v81F5M7UzvdPds6lKKm/6vap69er33V+9NyOxxBJLLLHEEsvASm0klsOijE5NTY3Jsc7f27dvv0f3dyybjyunRkbGVmswNSJgx7L5xGyZpo/O0+ziInU3Fs79So7XFmn61rIst2iTCOxmAjRP3QWlyxZbWb6II2pLalt+y7X/CcjPj8BuEh26xKFuVzsvFos0u0u4cx8Blb9R95bpEti5cy+IoniIC3UoOLCdAVA3KxXg4e/fC8DfleNt+ntOAZ5N0/Sh6BeNpyEWvQLUz0pwZZLetXR0r2WD8fHx+8jvzyuwe7uiOHHvx7WuVRzL8BRyWdlsFgLWAYhdACdieCevq2tDfftn6llp+5Poxw6zLnXuOAAF8doFtZmdgvMEdHJy8p4qoi9TbkX9h3PuiAjskIIq7soTCKo1hMSFuRcAI3jCwZ81oP6VYHug8vcYRDMqiCPq3j6LXwHtaAFpj9QFARf68nt+w3JiogGXBm3UIr7OEgZLIHgxFrm6r9zqvqlcuE+PX247t6093j5KOPmpReJuVW7eCys5T9NXUUTbscjhEOFCHO8oE/eBwrnzikZR3q1dLBsLKqNIChrFMP++A+cJKF0dA0zNcj1EN/Qt2rFyLCGMK2BJR2D7UBhEKNPsXEaSwLEQtVK7bs4y0NmdrTR9GIGxR7n2NgQvTP/9Uuf173lck+NvhJOPjD5uHzk2T/JnwQgynDpvOPU6J4W60x5FHJ+MPrm0B5js73H9Ho1YfSOC2t/oEkqtTJIXgsMUzFuKJNle1Q5VLeNf0ILGEaIWHF0URbNw7sVyfsZa2NDTITFsfWVIkwGL7Brm0a3G4MOR51CHEli4IPRNhaP+3QYAifuauVav0MePAmDkUESf/HEFxKdYUAXoS2loDXOCPkB4m0TSMBZcFA8RUXq7is5r1PU5ggutgFD0noV25FIB+fEmaFEnoch4N6koB6jfDyxMjQQjbc8sk2xHniRPGwigtOiT7EUyl4/BUyidm8L5PM8TzE/W4HQh3OcaQ7A2VAaTPsQWmfx/NBjxbV9MW1CLJHuZgrofgOWN/BF2QQhqKeO0FFQAvNrDs49w/eWdolxUI+t37NNPQLMs68i9/9ZWI3Jb0cKavALXADTmRwPTSRk8F/u6MUkmZSEvRZxXrV9mZ3YL15wvlHl/Agvq9dwhWshvJDCMOjUajQfBPcKYS/Hl7Eur5WVJMDLWRUz/lYn7Eefb72SHAEqLXueS7VBQn8dnh8sHzh0GUGtG773HJsgV1ANS8ZuJ8tsZG17ul72Xrg9TcyKOTjJcfyS41GZ5hLtfTvBWARUG2CXL88l+6s2Zi0cjaqVwZM0aWyBIHb/mj+G7aTAQdS1m1V64HAS6devW+6rqOR3ndZ3mhKtTD9Qax2Wtmh/nxDb4247hzS8MKuO6IuII5JxWC+4szhF0eZiXdI0f4Wi6LKTYMl0WsXBfKMYxhrb5p00G9ADqaIhQFcigYej354JCj6v06RIsbA22CYMalighkKqJPtwBuu5dAFSBmwcoBAEWsEmaL/DhaPAQZI0d/4m61RIAd06wPRbKit61gkrxz7i1iMBnw0WS5zg1b+aP4aISGIQ6c+deKW2uhNFXOHeVqIzXc89V0WweAz9bzp+I5AbOHSuciL9lzHfj3nx2aXMO2hE8ufcZPqi+3SHjPDNLsqfjKOM9g2AbgqtjHJECnwATwNtAvpq2iYy5FfMrs+wEkZIniKS490oMUVfrrY1F56T1AWZgCLQbjQnoUMSAYfXpNT7AAgMT2B2BcaBjZbGuxkP6e5x0V8U0Hso+9HpA5TXMjYESEo8swGMtByDZj0SEPycSrRDYk2SxPwxjR/XmH3UhUxIvVRArGECe86XcMWJBNTp1VDn5i4yydcA4SfYam86EFY17+vPj3yA+qDL05TXkv4lh5aIBLE80/lcm1qpaaIhcPiT0J/oJRb2zot3J8FVlsX6NOLHUG2Tyb3HOPSAMaBhUUikMmJbrzn0elQGSkgZc4i5UCbTIQIq/eAB8SU04/v65SgCH3xifoLINCAAWv67fmT6nGhvlorZKMbQBoJyfrtNp9AZohHF+PE/3T6XfAeDUSdPMA9UHwP3WWK6gjHNxXlm8TkVPypJ2X7HZHGRhOFHqopX0WwDQIKgAkdchRq0bBfHGrTd0NYxKWQA4XfCc+6AadtcQpFKOlFKIjFEKwP/G/a3RmDv3ZmSdxEt4uN5nhwW1aDRK9QjObxvDEGLcAgpuM97FrI7xF1j7UIdy708XTKaken+dpwW1Mo8KSiUVIljvGQL+ItMwsBO5vuIGXsiMAQiOuW5Qd+u5nW0zByysXTDcC34l+lBFkFhtgc7Epjpa7uRUik9rKHG7z6RYvuzvG0qoICq4OSR8zBMca998UKL8HL0BG2GzBVjI9R9y79hBgdpOkhyNmBzHQnBhLACeif9EtCWHBHzHmqks6wKVyXuZ79uxUBT/dI2UaEYp/q00QV6XY6Kd9Z9hYPF5CCrHI2gWVKomrpO5jjqN+dBGWdK92WfMmo/ScAMX+hsOULhThPPrdDr3k+v/IreumVPxd4hTsyQ5I8SpUxvAqUzh0VCjEcG2FgiIV8M9M0mSPNCfo20PnYXxCKrnGZzKseyCctENqPNG71EXXuWt+SgJyao8Go++e0XCgeimW1VKDepU5Detcy2dQjr1q2vUqfVedaq355gLiJDcNrb1+uwyIvtGOw8fVG1/AduHQIV0qwKV4pFrSSli1sbMLz3bEN0+eBlVcyQRwGXzCStk/X60fSitX+ZknfuCtLtZqPIP4IRerV8aSgDJWIW32qjLekHFe0MWVG99nhMA1Yrf20D0XCN1sY71pBcTIGyzt9Nsjq/GAEgUUBqsCipPAEBygO+nlhNlA0AgLyoDfzzkpyJKxL1OXCRWJZxpOO7r91PdDXggzpV7lDkeQaK4ColfzgEGGMbvEdSFrnoYL5pmPCYh6l5iY2oN4hdE95Gg+PUXDty2QkRpDtR3sBElJAHYb2MiSu6XKr5eTXdBQ5ZnU2UoECdaFQEXgSD6hkiZZae0aCj1ACqt320TEw8Ggdv8soDyKdsHbSARu+uqxFplKBkL+A7DeGGdSuMFVtp6Yr/wrfzYL44UfRr7nT7EsV/M92rrH6Z3f9BRRJqsS1Mk7jw7vonmzNCl6RVU+qkqMt/gEd5ZJDyut3VppP0nfZAglsH1IZcmnKVJD02WBtyygVkapvKmpVaGEP3gA8ZAG0SZlgIQ6Xe0rzr3Wc+g+hElPjOvMde6YvDBub9LvQxxX0TkIP1CwYeDzqdiIRGPtPlULAiiJACob/lUa8RgHs79mAvqWYV7lNo/xOsM04XChOiLcY2k2e1bvxTPeL4Kl+Y0c30fY78MxMsc7jQhyJssGAxSrBgmXCbYH2B8StFqUMM7H+ggc+fDtwa18wH6CMFsHf8W9rGWKwPmOCIWyzlSDFLEoTLBsKwO3HEgBu5egGHjBx/aXjCdoDKgb4Pt5EY/OAGAcA9Gjti/JeFNqIqK+RHQN4UD+uEyRiob9B4lbiVBugnGFdNqvM57yLXjoR+RmjJZmjoqnwWpNyS45b5fz0WfIXvD1Buse96D/Tl+eXS5BQsP+wGVOpFjYwxexxywRv4c5fzjxM07Hm1wtH41CRChThAoXCJkdmDBix19DO+B+VXMobZhuwlbzj0ysJvQe7MObXrYTRi47hNe6Hl7vX9vbcKu3SHb94uox1r2/ebevl9wBThAd9udAxOe0Za17vsNbOWo4XxgO0t9he0s9dA9wltJwltN1rGdZczEsoP3CO+cE+MDgf0Vduhfv8oO/ZNsDNT03+/v0EciPe7Q79PWUBo89l2apVzj8rs0CPpXv0vDHGLwXZqbkXmIoA72rbcZ7603xlwr33qD9YngQtVbb4jJQsnHt94G+H4qLE+EtGBx+e+nloH3U+FDIvcp9X3x/dRBv0nOWKRXkB6Kb5LHbz7Ebz4MEtRWlj05fp3l8P+O0q74HaVNXAiKTfHoJq/XxS+eHcbfJjQx4DlmPOK3CTeJbhXwdnYO4iuiIID4FdHN9AHn+L3f+GXuWOI39GOJ/+0ilvh/aWKJJZZYYoklllh6KP8HTHLih8tllvUAAAAASUVORK5CYII=" width="59" height="33" alt="Apache Kafka"></span><span>Made for Apache Kafka®</span></a>
-      <p>Apache®, <a href="https://kafka.apache.org/" target="_blank" rel="noopener">Apache Kafka, Kafka®</a>, and the Kafka logo are either registered trademarks or trademarks of the <a href="https://www.apache.org/" target="_blank" rel="noopener">Apache Software Foundation</a> in the United States and/or other countries. No endorsement by the Apache Software Foundation is implied by the use of these marks. Kafka Pilot is an independent learning tool.</p>
+      <p>Apache®, <a href="https://kafka.apache.org/" target="_blank" rel="noopener">Apache Kafka, Kafka®</a>, and the Kafka logo are either registered trademarks or trademarks of the <a href="https://www.apache.org/" target="_blank" rel="noopener">Apache Software Foundation</a> in the United States and/or other countries. No endorsement by the Apache Software Foundation is implied by the use of these marks. Kafka Config is an independent learning tool.</p>
     </footer>
   </main>
 </div>
@@ -787,7 +787,7 @@ const PRESETS = {
     consumers: 2, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', cleanup: 'delete', txn: false, onFail: 'dlq' },
 };
 const PKEYS = Object.keys(PRESETS.balanced).filter(k => k !== 'label' && k !== 'hint');
-const STORE = 'kafka-pilot-v2';
+const STORE = 'kafka-pilot-v2';  // storage keys keep the earlier name so saved answers survive the rename
 
 let S = { more: [], commitWhen: 'after', assign: 'range', security: 'none', racks: false, retBytes: 0, compactLag: 0, bufferMB: 32, staticMember: false, commitEvery: 5, goal: 'starter', topic: 'orders', host: 'kafka', group: 'orders-service', lang: 'java', keys: ['customer-42', 'customer-7'], hotKey: false };
 let importText = '', importReport = null, rk = 0;
@@ -795,15 +795,15 @@ PKEYS.forEach(k => { S[k] = PRESETS.starter[k]; });
 try { const saved = JSON.parse(localStorage.getItem(STORE) || 'null'); if (saved) S = Object.assign(S, saved); } catch (e) {}
 const down = new Set();
 /* ---------- Share ---------- */
-// A setup travels as a short code, KP1.<base64url JSON>: in a link after #s=, or pasted into Import
+// A setup travels as a short code, KC1.<base64url JSON>: in a link after #s=, or pasted into Import (older KP1 codes still load)
 const SHARE_KEYS = [...PKEYS, 'goal', 'topic', 'host', 'group', 'lang', 'keys', 'hotKey', 'more', 'commitWhen', 'assign', 'security', 'racks', 'retBytes', 'compactLag', 'bufferMB', 'staticMember', 'commitEvery'];
 const b64u = {
   enc: t => btoa(unescape(encodeURIComponent(t))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
   dec: t => decodeURIComponent(escape(atob(t.replace(/-/g, '+').replace(/_/g, '/')))) };
-const shareCode = () => 'KP1.' + b64u.enc(JSON.stringify(Object.fromEntries(SHARE_KEYS.map(k => [k, S[k]]))));
+const shareCode = () => 'KC1.' + b64u.enc(JSON.stringify(Object.fromEntries(SHARE_KEYS.map(k => [k, S[k]]))));
 const shareLink = () => location.href.split('#')[0] + '#s=' + shareCode();
 function readShareCode(txt) {
-  const m = /KP1\.([A-Za-z0-9_-]+)/.exec(txt || ''); if (!m) return null;
+  const m = /K[CP]1\.([A-Za-z0-9_-]+)/.exec(txt || ''); if (!m) return null;
   try {
     const o = JSON.parse(b64u.dec(m[1])), out = {};
     // keep only known settings with the expected type; normalize() then clamps every value
@@ -1713,7 +1713,7 @@ function importConfig(txt) {
     const asked = val;
     if (opts) val = opts.reduce((a, b) => Math.abs(b - val) < Math.abs(a - val) ? b : a);
     S[sk] = val; R.applied.push(k); want.push({ k, v, sk, asked });
-    if (k === 'retries' && ![0, 3].includes(num(v)) && num(v) < 1000) want[want.length - 1].note = 'Kafka Pilot offers never, 3 times, or until time runs out';
+    if (k === 'retries' && ![0, 3].includes(num(v)) && num(v) < 1000) want[want.length - 1].note = 'Kafka Config offers never, 3 times, or until time runs out';
   }
   normalize();
   for (const w of want) if (S[w.sk] !== w.asked || w.note)
@@ -1742,10 +1742,10 @@ function importConfig(txt) {
 function importReportHtml(R = importReport, rid = 'import-report') {
   if (!R) return '';
   return `<div class="report" id="${rid}" tabindex="-1">
-    <h4>${R.shared ? 'Loaded a shared setup. The diagram and every step now use it.' : R.applied.length ? `Loaded ${pl(R.applied.length, 'setting')}. The diagram and every step now use them.` : 'No settings Kafka Pilot knows were found.'}</h4>
+    <h4>${R.shared ? 'Loaded a shared setup. The diagram and every step now use it.' : R.applied.length ? `Loaded ${pl(R.applied.length, 'setting')}. The diagram and every step now use them.` : 'No settings Kafka Config knows were found.'}</h4>
     ${R.problems.length ? `<div class="notes">${R.problems.map(t => `<div class="note warn">${ICON.warn}<div><span class="sr">Problem: </span>${t}</div></div>`).join('')}</div>` : (R.applied.length ? `<div class="note ok">${ICON.ok}<div>No combinations that Kafka rejects.</div></div>` : '')}
     ${R.rounded.length ? `<div><b>Adjusted to fit</b><ul>${R.rounded.map(x => `<li>${x}</li>`).join('')}</ul></div>` : ''}
-    ${R.unknown.length ? `<div><b>Not covered by Kafka Pilot yet</b><p class="help">${R.unknown.map(k => `<code class="key">${esc(k)}</code>`).join(' ')}</p></div>` : ''}
+    ${R.unknown.length ? `<div><b>Not covered by Kafka Config yet</b><p class="help">${R.unknown.map(k => `<code class="key">${esc(k)}</code>`).join(' ')}</p></div>` : ''}
   </div>`;
 }
 
@@ -1891,7 +1891,7 @@ function controlsBody() {
       ${text('host', 'Broker host name prefix', '', `Brokers will be named ${esc(hostPrefix())}1, ${esc(hostPrefix())}2 and so on.`)}</div>` +
     `<div class="sub"><h3>Already have a config?</h3>
       <div class="q"><label class="qlabel" for="importText">Paste it to load and check it</label>
-      <p class="help">Works with .properties files, Spring Boot application.yml and Docker KAFKA_ variables. Kafka Pilot fills in every step and points out combinations Kafka rejects.</p>
+      <p class="help">Works with .properties files, Spring Boot application.yml and Docker KAFKA_ variables. Kafka Config fills in every step and points out combinations Kafka rejects.</p>
       <textarea class="field" id="importText" data-tip="import-text" spellcheck="false" autocomplete="off" placeholder="acks=all&#10;linger.ms=10&#10;group.id=orders-service">${esc(importText)}</textarea>
       <div class="actions"><button type="button" class="btn primary" data-act="import" data-tip="act:import">${ic('file-import')}Load and check</button>
       <button type="button" class="btn" data-act="example" data-tip="act:example">${ic('bug')}Try a broken example</button></div>
@@ -2857,8 +2857,8 @@ function tipText(key) {
     case 'back': return ['Back', step > 0 ? `Go back to ${STEPS[step - 1].name}.` : 'This is the first step.'];
     case 'next': return step < STEPS.length - 1 ? [`Next: ${STEPS[step + 1].name}`, `Continue to step ${step + 2}.`] : ['Start over', 'Back to the first step. Your answers stay.'];
     case 'theme': return ['Theme', { auto: 'Following your system (light or dark). Click for light.', light: 'Light. Click for dark.', dark: 'Dark. Click to follow your system.' }[document.documentElement.getAttribute('data-theme') || 'auto']];
-    case 'share': return ['Share setup', 'Get a link and a short code that open Kafka Pilot with exactly these answers.'];
-    case 'share-link': return ['Share link', 'Opens Kafka Pilot with this setup. Some sites drop the part after #; then use the code.'];
+    case 'share': return ['Share setup', 'Get a link and a short code that open Kafka Config with exactly these answers.'];
+    case 'share-link': return ['Share link', 'Opens Kafka Config with this setup. Some sites drop the part after #; then use the code.'];
     case 'share-code': return ['Setup code', 'Paste it into Import on the Goal step to load this setup.'];
     case 'share-copy-link': return ['Copy link', 'Copies the share link to your clipboard.'];
     case 'share-copy-code': return ['Copy code', 'Copies the setup code to your clipboard.'];
@@ -2869,7 +2869,7 @@ function tipText(key) {
       addkey: ['Add key', 'Adds the key to the list and shows which partition it goes to.'] }[a] || null;
     case 'delkey': return ['Remove key', 'Removes this key from the examples.'];
     case 'lane': return [['Your apps · write', 'Kafka cluster · store', 'Your services · read'][n], 'Scrolls the diagram to this section.'];
-    case 'kafka': return ['Apache Kafka', 'Opens kafka.apache.org, the home of Apache Kafka: documentation, downloads and the community. Kafka Pilot is an independent tool, not part of the Apache project.'];
+    case 'kafka': return ['Apache Kafka', 'Opens kafka.apache.org, the home of Apache Kafka: documentation, downloads and the community. Kafka Config is an independent tool, not part of the Apache project.'];
     case 'sem-open': return ['Delivery guarantees', 'Compare at most once, at least once and exactly once: what each promises, what a crash does, the settings and the standard code.'];
     case 'sem-lang': return ['Code language', 'Show the standard code patterns in Java or Python.'];
     case 'sem-use': return SEMANTICS[a] ? [`Use ${SEMANTICS[a].label.toLowerCase()}`, `Applies the standard settings: ${SEMINFO[a].cfg.join(', ')}.`] : null;

@@ -1,4 +1,4 @@
-// Kafka Pilot browser tests. Run with `npm test`. Exits non-zero when any check fails.
+// Kafka Config browser tests. Run with `npm test`. Exits non-zero when any check fails.
 // The page is wrapped the way the artifact host wraps it, then driven in headless Chromium.
 const { chromium } = require('playwright-core');
 const fs = require('fs'), path = require('path');
@@ -174,7 +174,7 @@ test('a shared link or code restores the same setup', async () => {
   await page.click('.steps button[data-goto="3"]'); await page.click('input[name="assign"][value="sticky"]', { force: true });
   await page.click('#share');
   const code = await page.inputValue('#share-code'), link = await page.inputValue('#share-link');
-  assert(/^KP1\.[A-Za-z0-9_-]+$/.test(code) && link.includes('#s=' + code), 'share code or link malformed');
+  assert(/^KC1\.[A-Za-z0-9_-]+$/.test(code) && link.includes('#s=' + code), 'share code or link malformed');
   const want = await page.evaluate(() => { const s = window.__kp.S(); return JSON.stringify([s.producers, s.partitions, s.assign, s.more.length]); });
   await page.context().close();
   // fresh browser opening the link
@@ -191,8 +191,11 @@ test('a shared link or code restores the same setup', async () => {
   const got3 = await p3.evaluate(() => { const s = window.__kp.S(); return JSON.stringify([s.producers, s.partitions, s.assign, s.more.length]); });
   assert(got3 === want, `import restored ${got3}, expected ${want}`);
   assert((await p3.textContent('#import-report')).includes('shared setup'), 'import report does not mention the shared setup');
+  // codes made before the rename (KP1) still load
+  await p3.fill('#importText', code.replace(/^KC1\./, 'KP1.')); await p3.click('[data-act="import"]'); await p3.waitForTimeout(150);
+  assert((await p3.textContent('#import-report')).includes('shared setup'), 'an old KP1 code no longer loads');
   // a broken code is ignored, not crashing
-  await p3.fill('#importText', 'KP1.!!!not-a-code'); await p3.click('[data-act="import"]');
+  await p3.fill('#importText', 'KC1.!!!not-a-code'); await p3.click('[data-act="import"]');
   noErrors(p3); await p3.context().close();
 });
 

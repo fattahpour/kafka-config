@@ -1,4 +1,4 @@
-# Kafka Pilot
+# Kafka Config
 
 A visual guide to configuring Apache Kafka®. Answer a few plain questions, watch a live diagram of producers, brokers and consumers react, and copy working config files for your language.
 
@@ -45,7 +45,7 @@ Messages, confirmations, refused writes, retries, replication and rebalances are
 
 ## Use it
 
-Open `index.html` through the live link above, or build a standalone copy (see [Build](#build)) and open `dist/kafka-pilot.html` in a browser. The page loads GSAP from cdnjs and fonts from Google Fonts; it works without them, with less animation and a fallback font.
+Open `index.html` through the live link above, or build a standalone copy (see [Build](#build)) and open `dist/kafka-config.html` in a browser. The page loads GSAP from cdnjs and fonts from Google Fonts; it works without them, with less animation and a fallback font.
 
 ## Project layout
 
@@ -92,9 +92,9 @@ Not covered by the smoke test: the Go and Spring files are not run, and the secu
 node scripts/build.js
 ```
 
-Writes `dist/kafka-pilot.html` (the page as a standalone document) and `dist/kafka-pilot-<version>.zip` with the licence notices.
+Writes `dist/kafka-config.html` (the page as a standalone document) and `dist/kafka-config-<version>.zip` with the licence notices.
 
-To upload both to a JFrog Artifactory generic repository under `kafka-pilot/<version>/`:
+To upload both to a JFrog Artifactory generic repository under `kafka-config/<version>/`:
 
 ```bash
 ARTIFACTORY_URL=https://yourcompany.jfrog.io/artifactory \
@@ -113,4 +113,4 @@ bash scripts/deploy-artifactory.sh
 
 Icons are from [Tabler Icons](https://tabler.io/icons) (MIT). The Kafka logo is the version published on kafka.apache.org (Apache License 2.0) and is used only as a link to the project, following the [ASF trademark policy](https://www.apache.org/foundation/marks/). See the `THIRD_PARTY_LICENSE-*.txt` files.
 
-Apache®, Apache Kafka, Kafka®, and the Kafka logo are either registered trademarks or trademarks of the Apache Software Foundation in the United States and/or other countries. No endorsement by the Apache Software Foundation is implied by the use of these marks. Kafka Pilot is an independent learning tool.
+Apache®, Apache Kafka, Kafka®, and the Kafka logo are either registered trademarks or trademarks of the Apache Software Foundation in the United States and/or other countries. No endorsement by the Apache Software Foundation is implied by the use of these marks. Kafka Config is an independent learning tool.

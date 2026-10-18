@@ -1,5 +1,5 @@
-// Builds dist/: a standalone kafka-pilot.html (the page wrapped in a full HTML document, since outside
-// claude.ai there is no host to add one) plus licence notices, zipped as kafka-pilot-<version>.zip.
+// Builds dist/: a standalone kafka-config.html (the page wrapped in a full HTML document, since outside
+// claude.ai there is no host to add one) plus licence notices, zipped as kafka-config-<version>.zip.
 const fs = require('fs'), path = require('path'), zlib = require('zlib');
 // A minimal zip writer (deflate, no external tools): local headers, data, central directory
 const CRC = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
@@ -22,10 +22,10 @@ const ROOT = path.join(__dirname, '..'), DIST = path.join(ROOT, 'dist');
 const version = require(path.join(ROOT, 'package.json')).version;
 fs.rmSync(DIST, { recursive: true, force: true }); fs.mkdirSync(DIST);
 const page = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-fs.writeFileSync(path.join(DIST, 'kafka-pilot.html'),
+fs.writeFileSync(path.join(DIST, 'kafka-config.html'),
   '<!doctype html>\n<html lang="en">\n<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
   + '<style>[hidden]{display:none!important}</style></head>\n<body>\n' + page + '\n</body>\n</html>\n');
 for (const f of fs.readdirSync(ROOT).filter(f => f.startsWith('THIRD_PARTY_LICENSE'))) fs.copyFileSync(path.join(ROOT, f), path.join(DIST, f));
-const zip = `kafka-pilot-${version}.zip`;
+const zip = `kafka-config-${version}.zip`;
 writeZip(path.join(DIST, zip), fs.readdirSync(DIST).sort().map(f => [f, fs.readFileSync(path.join(DIST, f))]));
-console.log(`dist/${zip} (${(fs.statSync(path.join(DIST, zip)).size / 1024).toFixed(0)} KB) and dist/kafka-pilot.html, version ${version}`);
+console.log(`dist/${zip} (${(fs.statSync(path.join(DIST, zip)).size / 1024).toFixed(0)} KB) and dist/kafka-config.html, version ${version}`);

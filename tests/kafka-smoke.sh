@@ -1,5 +1,5 @@
 #!/bin/bash
-# Runs the files Kafka Pilot generates against a real Kafka cluster in Docker.
+# Runs the files Kafka Config generates against a real Kafka cluster in Docker.
 # Checks: the compose file starts, the setup command creates the topic, producer and consumer
 # properties work with the Kafka CLI, keys land where the page says, the Python client config is
 # accepted by librdkafka, and a write is refused when fewer than min.insync.replicas copies are up.
@@ -13,7 +13,7 @@ node tests/kafka/dump.js "$OUT/pay" payments range none '{"staticMember":true,"r
 node tests/kafka/dump.js "$OUT/sticky" balanced sticky >/dev/null
 node tests/kafka/dump.js "$OUT/cdc" cdc range >/dev/null
 node tests/kafka/dump.js "$OUT/sec" balanced range sasl >/dev/null
-openssl req -x509 -newkey rsa:2048 -nodes -keyout "$OUT/sec/ca.key" -out "$OUT/sec/ca.pem" -days 1 -subj "/CN=kafka-pilot-test-ca" >/dev/null 2>&1
+openssl req -x509 -newkey rsa:2048 -nodes -keyout "$OUT/sec/ca.key" -out "$OUT/sec/ca.pem" -days 1 -subj "/CN=kafka-config-test-ca" >/dev/null 2>&1
 DC="docker compose -p $P -f $OUT/docker-compose.yml"
 cleanup() { $DC down -v --remove-orphans >/dev/null 2>&1; }
 trap cleanup EXIT

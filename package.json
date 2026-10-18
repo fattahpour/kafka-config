@@ -1,5 +1,5 @@
 {
-  "name": "kafka-pilot",
+  "name": "kafka-config",
   "private": true,
   "description": "Interactive Kafka producer, broker and consumer configuration guide",
   "scripts": {

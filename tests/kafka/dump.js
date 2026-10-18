@@ -1,4 +1,4 @@
-// Writes the files Kafka Pilot generates for one setup into a folder, for tests/kafka-smoke.sh
+// Writes the files Kafka Config generates for one setup into a folder, for tests/kafka-smoke.sh
 // usage: node tests/kafka/dump.js <outdir> <kind-of-data> [assign]
 const { chromium } = require('playwright-core');
 const fs = require('fs'), path = require('path');

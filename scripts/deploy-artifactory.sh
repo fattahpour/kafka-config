@@ -4,7 +4,7 @@
 #   ARTIFACTORY_REPO   e.g. generic-local
 #   ARTIFACTORY_TOKEN  an access token, or ARTIFACTORY_TOKEN_FILE pointing to a file that holds it
 #                      (or set ARTIFACTORY_USER and ARTIFACTORY_PASSWORD)
-# Files land at <repo>/kafka-pilot/<version>/; checksums are sent so Artifactory verifies them.
+# Files land at <repo>/kafka-config/<version>/; checksums are sent so Artifactory verifies them.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 : "${ARTIFACTORY_URL:?set ARTIFACTORY_URL}" "${ARTIFACTORY_REPO:?set ARTIFACTORY_REPO}"
@@ -15,8 +15,8 @@ elif [ -n "${ARTIFACTORY_USER:-}" ]; then AUTH=(-u "$ARTIFACTORY_USER:${ARTIFACT
 else echo "set ARTIFACTORY_TOKEN, or ARTIFACTORY_USER and ARTIFACTORY_PASSWORD" >&2; exit 1; fi
 VERSION=$(node -p "require('./package.json').version")
 node scripts/build.js
-BASE="${ARTIFACTORY_URL%/}/$ARTIFACTORY_REPO/kafka-pilot/$VERSION"
-for f in "kafka-pilot-$VERSION.zip" kafka-pilot.html; do
+BASE="${ARTIFACTORY_URL%/}/$ARTIFACTORY_REPO/kafka-config/$VERSION"
+for f in "kafka-config-$VERSION.zip" kafka-config.html; do
   echo "uploading $f -> $BASE/$f"
   curl -fsS -X PUT "${AUTH[@]}" \
     -H "X-Checksum-Sha1: $(sha1sum "dist/$f" | cut -d' ' -f1)" \
