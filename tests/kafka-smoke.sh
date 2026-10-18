@@ -8,7 +8,8 @@ cd "$(dirname "$0")/.."
 OUT=tests/out/kafka; P=kpsmoke; FAIL=0
 pass() { echo "  ✓ $*"; }
 fail() { echo "  ✗ $*"; FAIL=1; }
-rm -rf "$OUT"; node tests/kafka/dump.js "$OUT" balanced range >/dev/null
+rm -rf "$OUT"; node tests/kafka/dump.js "$OUT" balanced range none '{"racks":true,"retBytes":1}' >/dev/null
+node tests/kafka/dump.js "$OUT/pay" payments range none '{"staticMember":true,"racks":true}' >/dev/null
 node tests/kafka/dump.js "$OUT/sticky" balanced sticky >/dev/null
 node tests/kafka/dump.js "$OUT/cdc" cdc range >/dev/null
 node tests/kafka/dump.js "$OUT/sec" balanced range sasl >/dev/null
@@ -30,6 +31,9 @@ eval "K kafka1 $CREATE" >/dev/null 2>&1 && pass "topic created with the generate
 DESC=$(K kafka1 kafka-topics.sh --bootstrap-server kafka1:9092 --describe --topic orders 2>/dev/null)
 echo "$DESC" | grep -q "PartitionCount: 6" && echo "$DESC" | grep -q "ReplicationFactor: 3" && echo "$DESC" | grep -q "min.insync.replicas=2" \
   && pass "6 partitions, 3 copies, min.insync.replicas=2, as the page says" || fail "topic layout differs: $DESC"
+echo "$DESC" | grep -q "retention.bytes=1073741824" && pass "size limit retention.bytes=1 GB set on the topic" || fail "retention.bytes missing: $DESC"
+RACKS=$(for b in 1 2 3; do K kafka1 kafka-configs.sh --bootstrap-server kafka1:9092 --describe --entity-type brokers --entity-name $b --all 2>/dev/null | grep -E "^ *broker.rack=" | head -1; done)
+[ "$(echo "$RACKS" | grep -c 'broker.rack=zone-')" = 3 ] && pass "brokers run in zones: $(echo $RACKS | tr '\n' ' ')" || fail "broker.rack not set: $RACKS"
 
 echo "producer.properties and consumer.properties"
 for f in producer.properties consumer.properties; do $DC cp "$OUT/$f" "kafka1:/tmp/$f" >/dev/null; done
@@ -101,6 +105,35 @@ for name, cls in (('producer', Producer), ('consumer', Consumer)):
 PY
 PYSEC=$(docker run --rm -v "$PWD/$OUT/sec:/w" python:3.12-slim sh -c "pip install -q confluent-kafka >/dev/null 2>&1 && python /w/py_sec.py" 2>&1)
 [ "$(echo "$PYSEC" | grep -c '^PYSEC .* sasl_ssl SCRAM-SHA-512')" = 2 ] && pass "librdkafka accepts the Python security settings" || fail "python security: $(echo "$PYSEC" | tail -3)"
+
+echo "exactly once (Payment system: transactions, static membership, zones)"
+K kafka1 kafka-topics.sh --bootstrap-server kafka1:9092 --create --topic tx-check --partitions 3 --replication-factor 3 --config min.insync.replicas=2 >/dev/null 2>&1
+cat > "$OUT/pay/py_tx.py" <<'PY'
+import ast, re
+from confluent_kafka import Producer, Consumer
+src = open('/w/kafka_client.py').read()
+conf = {n: ast.literal_eval(re.sub(r'#[^\n]*', '', re.search(n + r' = \w+\((\{.*?\n\})\)', src, re.S).group(1))) for n in ('producer', 'consumer')}
+assert conf['producer'].get('transactional.id') and conf['consumer'].get('isolation.level') == 'read_committed', 'transaction settings missing'
+assert conf['consumer'].get('group.instance.id') and conf['consumer'].get('client.rack'), 'static membership or zone missing'
+p = Producer(conf['producer']); p.init_transactions()
+p.begin_transaction()
+for i in range(3): p.produce('tx-check', key=f'acct-{i}', value=f'committed-{i}')
+p.commit_transaction()
+p.begin_transaction(); p.produce('tx-check', key='acct-x', value='aborted'); p.abort_transaction()
+c = Consumer({**conf['consumer'], 'group.id': 'tx-check-group'}); c.subscribe(['tx-check'])
+got = []
+for _ in range(30):
+    for m in c.consume(num_messages=10, timeout=1.0):
+        if not m.error(): got.append(m.value().decode())
+    if len(got) >= 3: break
+for _ in range(3): got += [m.value().decode() for m in c.consume(num_messages=10, timeout=1.0) if not m.error()]
+c.close()
+print('PYTX', sorted(got))
+PY
+PYTX=$(docker run --rm --network "$NET" -v "$PWD/$OUT/pay:/w" python:3.12-slim sh -c "pip install -q confluent-kafka >/dev/null 2>&1 && python /w/py_tx.py" 2>&1)
+echo "$PYTX" | grep -q "PYTX \['committed-0', 'committed-1', 'committed-2'\]" \
+  && pass "a transaction commits 3 messages, an aborted one stays invisible to read_committed; static membership and client.rack accepted" \
+  || fail "transactions: $(echo "$PYTX" | tail -3)"
 
 echo "a broker goes down"
 K kafka1 kafka-topics.sh --bootstrap-server kafka1:9092 --create --topic strict --partitions 1 --replication-factor 3 --config min.insync.replicas=3 >/dev/null 2>&1

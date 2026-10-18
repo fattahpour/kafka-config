@@ -270,6 +270,29 @@ test('buttons look clickable and their tooltips never cover them', async () => {
   noErrors(page); await page.context().close();
 });
 
+test('new settings: transactions, static membership, zones, size limit, buffer, commit interval', async () => {
+  const page = await open();
+  await page.selectOption('#pb-goal', 'payments'); await page.waitForTimeout(100);
+  assert(await page.evaluate(() => window.__kp.S().txn) === true, 'Payment system should use exactly once');
+  const step = n => page.click(`.steps button[data-goto="${n}"]`);
+  await step(1); await page.click('#racks', { force: true }); await page.click('input[name="retBytes"][value="1"]', { force: true });
+  await step(2); await page.click('input[name="bufferMB"][value="64"]', { force: true });
+  await step(3); await page.click('#staticMember', { force: true }); await page.click('input[name="autoCommit"][value="true"]', { force: true });
+  await page.fill('#commitEvery', '10'); await page.dispatchEvent('#commitEvery', 'input');
+  const f = await page.evaluate(() => window.__kp.files());
+  const need = [['producer.properties', 'transactional.id=orders-producer-1'], ['producer.properties', 'transaction.timeout.ms=300000'], ['producer.properties', 'buffer.memory=67108864'],
+    ['consumer.properties', 'isolation.level=read_committed'], ['consumer.properties', 'group.instance.id=orders-service-1'], ['consumer.properties', 'client.rack=zone-1'],
+    ['consumer.properties', 'auto.commit.interval.ms=10000'], ['server.properties', 'broker.rack=zone-1'], ['server.properties', 'RackAwareReplicaSelector'],
+    ['server.properties', 'log.retention.bytes=1073741824'], ['setup.sh', '--config retention.bytes=1073741824'], ['docker-compose.yml', 'KAFKA_BROKER_RACK: zone-3'],
+    ['kafka_client.py', '"isolation.level": "read_committed"'], ['application.yml', 'transaction-id-prefix: orders-tx-']];
+  const miss = need.filter(([n, x]) => !f[n].includes(x)).map(([n, x]) => `${n}: ${x}`);
+  assert(!miss.length, 'missing in files: ' + miss.join(' | '));
+  // transactions switch off by itself when acks is not "all"
+  await step(2); await page.click('input[name="acks"][value="1"]', { force: true });
+  assert(await page.evaluate(() => window.__kp.S().txn) === false, 'transactions must turn off without acks=all');
+  noErrors(page); await page.context().close();
+});
+
 test('theme switch cycles and is remembered', async () => {
   const page = await open();
   const theme = () => page.evaluate(() => document.documentElement.getAttribute('data-theme') || 'auto');

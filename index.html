@@ -706,71 +706,71 @@ const PRESETS = {
     producers: 1, brokers: 1, partitions: 1, rf: 1, minIsr: 1, retention: 7, maxMsgMB: 1, replicaLag: 30,
     acks: 'all', idem: true, linger: 5, batch: 16, compression: 'lz4',
     retries: 'max', deliveryTimeout: 120, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
-    consumers: 1, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', cleanup: 'delete', onFail: 'dlq' },
+    consumers: 1, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', cleanup: 'delete', txn: false, onFail: 'dlq' },
   safe: { label: 'Never lose a message', hint: 'Orders, bookings, anything you must not drop.',
     producers: 2, brokers: 3, partitions: 6, rf: 3, minIsr: 2, retention: 30, maxMsgMB: 1, replicaLag: 30,
     acks: 'all', idem: true, linger: 5, batch: 16, compression: 'lz4',
     retries: 'max', deliveryTimeout: 300, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
-    consumers: 3, reset: 'earliest', autoCommit: false, maxPoll: 200, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', cleanup: 'delete', onFail: 'dlq' },
+    consumers: 3, reset: 'earliest', autoCommit: false, maxPoll: 200, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', cleanup: 'delete', txn: false, onFail: 'dlq' },
   // Money: never lose, duplicate or reorder a payment for the same account. A failing payment is retried, not skipped,
   // so later payments on that account wait behind it; a month of history allows audits and replays.
   payments: { label: 'Payment system', hint: 'Payments and refunds. Never lose, duplicate or reorder a payment for one account.',
     producers: 2, brokers: 3, partitions: 6, rf: 3, minIsr: 2, retention: 30, maxMsgMB: 1, replicaLag: 30,
     acks: 'all', idem: true, linger: 0, batch: 16, compression: 'lz4',
     retries: 'max', deliveryTimeout: 300, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
-    consumers: 3, reset: 'earliest', autoCommit: false, maxPoll: 100, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', cleanup: 'delete', onFail: 'retry' },
+    consumers: 3, reset: 'earliest', autoCommit: false, maxPoll: 100, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', cleanup: 'delete', txn: true, onFail: 'retry' },
   balanced: { label: 'Balanced', hint: 'A safe starting point for most services.',
     producers: 2, brokers: 3, partitions: 6, rf: 3, minIsr: 2, retention: 7, maxMsgMB: 1, replicaLag: 30,
     acks: 'all', idem: true, linger: 10, batch: 64, compression: 'lz4',
     retries: 'max', deliveryTimeout: 120, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
-    consumers: 3, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', cleanup: 'delete', onFail: 'dlq' },
+    consumers: 3, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', cleanup: 'delete', txn: false, onFail: 'dlq' },
   bulk: { label: 'Move lots of data', hint: 'Logs, metrics, clicks. Losing a rare message is acceptable.',
     producers: 3, brokers: 3, partitions: 12, rf: 2, minIsr: 1, retention: 1, maxMsgMB: 1, replicaLag: 30,
     acks: '1', idem: false, linger: 50, batch: 256, compression: 'zstd',
     retries: 'max', deliveryTimeout: 120, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
-    consumers: 4, reset: 'latest', autoCommit: true, maxPoll: 1000, fetchMin: 65536, sessionTimeout: 45, pollInterval: 10, speed: 'fast', cleanup: 'delete', onFail: 'dlq' },
+    consumers: 4, reset: 'latest', autoCommit: true, maxPoll: 1000, fetchMin: 65536, sessionTimeout: 45, pollInterval: 10, speed: 'fast', cleanup: 'delete', txn: false, onFail: 'dlq' },
   fast: { label: 'Lowest delay', hint: 'Live dashboards, chat, alerts.',
     producers: 2, brokers: 3, partitions: 6, rf: 3, minIsr: 2, retention: 1, maxMsgMB: 1, replicaLag: 30,
     acks: '1', idem: false, linger: 0, batch: 16, compression: 'none',
     retries: '3', deliveryTimeout: 30, requestTimeout: 10, retryBackoff: 50, maxInFlight: 5, maxBlock: 5,
-    consumers: 3, reset: 'latest', autoCommit: true, maxPoll: 100, fetchMin: 1, sessionTimeout: 15, pollInterval: 1, speed: 'fast', cleanup: 'delete', onFail: 'dlq' },
+    consumers: 3, reset: 'latest', autoCommit: true, maxPoll: 100, fetchMin: 1, sessionTimeout: 15, pollInterval: 1, speed: 'fast', cleanup: 'delete', txn: false, onFail: 'dlq' },
   // Slow work per message: small polls and a long time limit, so a busy consumer is not thrown out of the group
   jobs: { label: 'Background jobs', hint: 'Emails to send, images to resize. Each one takes a while.',
     producers: 2, brokers: 3, partitions: 12, rf: 3, minIsr: 2, retention: 7, maxMsgMB: 1, replicaLag: 30,
     acks: 'all', idem: true, linger: 5, batch: 16, compression: 'lz4',
     retries: 'max', deliveryTimeout: 120, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
-    consumers: 6, reset: 'earliest', autoCommit: false, maxPoll: 10, fetchMin: 1, sessionTimeout: 45, pollInterval: 15, speed: 'slow', cleanup: 'delete', onFail: 'dlq' },
+    consumers: 6, reset: 'earliest', autoCommit: false, maxPoll: 10, fetchMin: 1, sessionTimeout: 45, pollInterval: 15, speed: 'slow', cleanup: 'delete', txn: false, onFail: 'dlq' },
   // Huge numbers of tiny readings: batch and compress hard, keep only 2 copies, and keep each device's readings
   // in order (idempotence), so a retried old reading never lands after a newer one
   iot: { label: 'Sensor and device data', hint: 'Many small readings from devices. The newest matters most.',
     producers: 4, brokers: 3, partitions: 12, rf: 2, minIsr: 1, retention: 1, maxMsgMB: 1, replicaLag: 30,
     acks: 'all', idem: true, linger: 25, batch: 64, compression: 'zstd',
     retries: 'max', deliveryTimeout: 60, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 30,
-    consumers: 4, reset: 'latest', autoCommit: true, maxPoll: 1000, fetchMin: 65536, sessionTimeout: 45, pollInterval: 10, speed: 'fast', cleanup: 'delete', onFail: 'dlq' },
+    consumers: 4, reset: 'latest', autoCommit: true, maxPoll: 1000, fetchMin: 65536, sessionTimeout: 45, pollInterval: 10, speed: 'fast', cleanup: 'delete', txn: false, onFail: 'dlq' },
   // Row changes from a database: never lose one, keep order per row, so a failing change is retried, not skipped
   cdc: { label: 'Database changes', hint: 'Row updates copied to other systems (CDC). Order per row matters.',
     producers: 1, brokers: 3, partitions: 6, rf: 3, minIsr: 2, retention: 7, maxMsgMB: 5, replicaLag: 30,
     acks: 'all', idem: true, linger: 10, batch: 64, compression: 'lz4',
     retries: 'max', deliveryTimeout: 300, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
-    consumers: 3, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', cleanup: 'compact', onFail: 'retry' },
+    consumers: 3, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', cleanup: 'compact', txn: false, onFail: 'retry' },
   // A history kept for a month so it can be replayed or checked later; few writers, compressed well
   audit: { label: 'Audit and history log', hint: 'Who did what and when. Kept to replay or check later.',
     producers: 2, brokers: 3, partitions: 3, rf: 3, minIsr: 2, retention: 30, maxMsgMB: 1, replicaLag: 30,
     acks: 'all', idem: true, linger: 20, batch: 64, compression: 'zstd',
     retries: 'max', deliveryTimeout: 300, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
-    consumers: 2, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', cleanup: 'delete', onFail: 'dlq' },
+    consumers: 2, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', cleanup: 'delete', txn: false, onFail: 'dlq' },
 };
 const PKEYS = Object.keys(PRESETS.balanced).filter(k => k !== 'label' && k !== 'hint');
 const STORE = 'kafka-pilot-v2';
 
-let S = { more: [], assign: 'range', security: 'none', goal: 'starter', topic: 'orders', host: 'kafka', group: 'orders-service', lang: 'java', keys: ['customer-42', 'customer-7'], hotKey: false };
+let S = { more: [], assign: 'range', security: 'none', racks: false, retBytes: 0, compactLag: 0, bufferMB: 32, staticMember: false, commitEvery: 5, goal: 'starter', topic: 'orders', host: 'kafka', group: 'orders-service', lang: 'java', keys: ['customer-42', 'customer-7'], hotKey: false };
 let importText = '', importReport = null, rk = 0;
 PKEYS.forEach(k => { S[k] = PRESETS.starter[k]; });
 try { const saved = JSON.parse(localStorage.getItem(STORE) || 'null'); if (saved) S = Object.assign(S, saved); } catch (e) {}
 const down = new Set();
 /* ---------- Share ---------- */
 // A setup travels as a short code, KP1.<base64url JSON>: in a link after #s=, or pasted into Import
-const SHARE_KEYS = [...PKEYS, 'goal', 'topic', 'host', 'group', 'lang', 'keys', 'hotKey', 'more', 'assign', 'security'];
+const SHARE_KEYS = [...PKEYS, 'goal', 'topic', 'host', 'group', 'lang', 'keys', 'hotKey', 'more', 'assign', 'security', 'racks', 'retBytes', 'compactLag', 'bufferMB', 'staticMember', 'commitEvery'];
 const b64u = {
   enc: t => btoa(unescape(encodeURIComponent(t))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
   dec: t => decodeURIComponent(escape(atob(t.replace(/-/g, '+').replace(/_/g, '/')))) };
@@ -877,6 +877,14 @@ function normalize() {
   if (!SPEED[S.speed]) S.speed = 'normal';
   if (!ASSIGN[S.assign]) S.assign = 'range';
   if (!SEC[S.security]) S.security = 'none';
+  // transactions build on idempotence, which needs acks=all and retries
+  if (S.acks !== 'all' || S.retries === '0') S.txn = false;
+  if (S.txn) S.idem = true;
+  if (![0, 1, 10].includes(S.retBytes)) S.retBytes = 0;
+  if (![0, 1, 24].includes(S.compactLag)) S.compactLag = 0;
+  if (![32, 64, 128].includes(S.bufferMB)) S.bufferMB = 32;
+  S.commitEvery = clamp(Number(S.commitEvery) || 5, 1, 30);
+  S.racks = !!S.racks; S.staticMember = !!S.staticMember;
   if (S.cleanup !== 'compact') S.cleanup = 'delete';
   S.more = (Array.isArray(S.more) ? S.more : []).slice(0, 2).map(g => ({ name: String(g.name || '').slice(0, 60),
     consumers: clamp(Number(g.consumers) || 1, 1, 8), speed: SPEED[g.speed] ? g.speed : 'normal' }));
@@ -1041,6 +1049,8 @@ function parts() {
 function checks() {
   const w = [];
   if (S.cleanup === 'compact' && !S.keys.length) w.push({ step: 1, lvl: 'warn', text: 'A compacted topic keeps the newest message for each key, so every message needs a key. Kafka refuses messages without one. Add keys on the Producer step.' });
+  if (S.txn) w.push({ step: 2, lvl: 'info', text: 'Exactly once covers work inside Kafka: read, process and write back in one transaction. Effects outside Kafka, like emails or database writes, still need to be safe to repeat.' });
+  if (S.racks && S.brokers < 3) w.push({ step: 1, lvl: 'info', text: `With ${pl(S.brokers, 'broker')} the copies cannot cover three zones. Use at least one broker per zone.` });
   if (S.security === 'none') w.push({ step: 1, lvl: 'info', text: 'Plain text: anyone on the network can read the messages and connect. Use encryption and passwords outside a laptop or closed test network.' });
   if (S.rf === 1) w.push({ step: 1, lvl: 'warn', text: 'Each message is stored on one broker only. If that broker fails, its messages are gone. Use 3 copies for anything important.' });
   if (S.rf > 1 && S.minIsr === S.rf && S.acks === 'all') w.push({ step: 1, lvl: 'warn', text: `Writes stop as soon as any one broker is down, because all ${S.rf} copies must confirm. Set “copies that must confirm” to ${S.rf - 1}.` });
@@ -1100,7 +1110,13 @@ function producerFile() {
     S.maxInFlight === 1 ? '# One request at a time per broker: order is always kept' : (S.idem ? '# Up to 5 requests at once per broker; idempotence keeps them in order' : '# Up to 5 requests at once per broker; a retry can reorder messages'),
     `max.in.flight.requests.per.connection=${S.maxInFlight}`,
     `# send() blocks at most ${S.maxBlock} s when the buffer is full or no broker is reachable, then throws`,
-    `max.block.ms=${S.maxBlock * 1000}`, ...javaSec('producer')];
+    `max.block.ms=${S.maxBlock * 1000}`,
+    `# Memory for messages waiting to be sent (${S.bufferMB} MB); when it is full, send() waits max.block.ms`,
+    `buffer.memory=${S.bufferMB * 1048576}`,
+    ...(S.txn ? ['', '# --- Exactly once: transactions ---', '# Unique and stable per running instance (add the host name); Kafka uses it to fence off an old copy of the same app',
+      `transactional.id=${topic()}-producer-1`, '# Abort a transaction left open longer than this; at least delivery.timeout.ms, or librdkafka clients refuse to start', `transaction.timeout.ms=${txTimeout()}`,
+      '# In code: initTransactions() once, then beginTransaction(), send(), sendOffsetsToTransaction(), commitTransaction()'] : []),
+    ...javaSec('producer')];
   return L.join('\n');
 }
 function consumerFile() {
@@ -1114,7 +1130,7 @@ function consumerFile() {
     `auto.offset.reset=${S.reset}`,
     S.autoCommit ? '# Mark messages as read automatically every 5 seconds' : '# Your code calls commitSync() after it finishes processing',
     `enable.auto.commit=${S.autoCommit}`];
-  if (S.autoCommit) L.push('auto.commit.interval.ms=5000');
+  if (S.autoCommit) L.push(`auto.commit.interval.ms=${S.commitEvery * 1000}`);
   L.push('', `# Hand your code up to ${S.maxPoll} messages per poll()`, `max.poll.records=${S.maxPoll}`,
     S.fetchMin === 1 ? '# Return data as soon as any is available' : '# Wait for 64 KB of data, or 0.5 s, whichever comes first',
     `fetch.min.bytes=${S.fetchMin}`,
@@ -1136,6 +1152,10 @@ function consumerFile() {
   if (S.onFail === 'dlq') L.push(`# Messages your code cannot handle go to the "${topic()}.dlq" topic (see ConsumerLoop.java)`);
   if (S.more.length) L.push('', `# Other groups reading "${topic()}": ${list(S.more.map(g => `${g.name.trim() || 'other-service'} (${pl(g.consumers, 'consumer')})`))}.`,
     '# Each uses this same file with its own group.id and gets every message.');
+  if (S.txn) L.push('', '# Read only messages from committed transactions', 'isolation.level=read_committed');
+  if (S.staticMember) L.push('', '# Static membership: a restart within session.timeout.ms keeps its partitions, so no rebalance.',
+    '# Must be unique per running instance, for example the host or pod name', `group.instance.id=${group()}-1`);
+  if (S.racks) L.push('', '# Read from the copy in this app\'s own zone (needs replica.selector.class on the brokers)', 'client.rack=zone-1');
   L.push(...javaSec('consumer'));
   return L.join('\n');
 }
@@ -1197,6 +1217,11 @@ function serverFile() {
     `min.insync.replicas=${S.minIsr}`,
     S.cleanup === 'compact' ? '# Keep the newest message for each key; remove older ones with the same key' : `# Keep messages for ${pl(S.retention, 'day')}`,
     `log.cleanup.policy=${S.cleanup}`,
+    ...(S.retBytes ? [`# Also cap each partition at ${S.retBytes} GB; the oldest messages go first`, `log.retention.bytes=${S.retBytes * 1073741824}`] : []),
+    ...(S.cleanup === 'compact' ? [`# A message is never compacted away sooner than this after it is written`, `log.cleaner.min.compaction.lag.ms=${S.compactLag * 3600000}`,
+      '# Keep delete markers (tombstones) for a day, so slow readers still see the delete', 'log.cleaner.delete.retention.ms=86400000'] : []),
+    ...(S.racks ? ['# The zone (rack) this broker runs in: zone-1, zone-2, zone-3. Kafka puts copies of a partition in different zones.', 'broker.rack=zone-1',
+      '# Let consumers read from a copy in their own zone instead of always the leader', 'replica.selector.class=org.apache.kafka.common.replica.RackAwareReplicaSelector'] : []),
     `log.retention.hours=${S.retention * 24}`,
     '# Create topics on purpose, never by a typo in client code',
     'auto.create.topics.enable=false',
@@ -1213,6 +1238,11 @@ function serverFile() {
     `transaction.state.log.min.isr=${S.minIsr}`);
   return L.join('\n');
 }
+// a transaction must be allowed to stay open at least as long as one message may take to deliver
+const txTimeout = () => Math.max(60000, S.deliveryTimeout * 1000);
+// topic settings beyond partitions, copies and the clean-up policy
+const topicExtras = () => (S.retBytes ? ` --config retention.bytes=${S.retBytes * 1073741824}` : '')
+  + (S.cleanup === 'compact' && S.compactLag ? ` --config min.compaction.lag.ms=${S.compactLag * 3600000}` : '');
 function setupFile() {
   const bs = hostList(9092)[0], adm = S.security === 'none' ? '' : ' --command-config admin.properties';
   return ['# 1. Run once: create one cluster ID and reuse it on every broker',
@@ -1227,7 +1257,7 @@ function setupFile() {
     `# 3. Create the "${topic()}" topic`,
     `bin/kafka-topics.sh --bootstrap-server ${bs}${adm} --create --topic ${topic()} \\`,
     `  --partitions ${S.partitions} --replication-factor ${S.rf} \\`,
-    `  --config min.insync.replicas=${S.minIsr} ${S.cleanup === 'compact' ? '--config cleanup.policy=compact' : `--config retention.ms=${S.retention * 86400000}`}`,
+    `  --config min.insync.replicas=${S.minIsr} ${S.cleanup === 'compact' ? '--config cleanup.policy=compact' : `--config retention.ms=${S.retention * 86400000}`}${topicExtras()}`,
     ...(S.onFail === 'dlq' ? ['', `# 3b. Dead-letter topic for messages your code could not handle (kept 30 days)`,
       `bin/kafka-topics.sh --bootstrap-server ${bs}${adm} --create --topic ${topic()}.dlq \\`,
       `  --partitions 1 --replication-factor ${S.rf} --config retention.ms=2592000000`] : []),
@@ -1247,7 +1277,9 @@ function rdProducer() {
   if (S.acks !== '0') e.push(['retries', S.retries === 'max' ? 2147483647 : Number(S.retries)],
     ['delivery.timeout.ms', S.deliveryTimeout * 1000], ['request.timeout.ms', S.requestTimeout * 1000],
     ['retry.backoff.ms', S.retryBackoff], ['retry.backoff.max.ms', Math.max(1000, S.retryBackoff)]);
-  e.push(['max.in.flight.requests.per.connection', S.maxInFlight], ...rdSec('producer'));
+  e.push(['max.in.flight.requests.per.connection', S.maxInFlight]);
+  if (S.txn) e.push(['transactional.id', `${topic()}-producer-1`, 'unique per instance'], ['transaction.timeout.ms', txTimeout(), 'must be >= delivery.timeout.ms']);
+  e.push(...rdSec('producer'));
   return e;
 }
 function rdConsumer(storeOffsets) {
@@ -1257,7 +1289,12 @@ function rdConsumer(storeOffsets) {
   e.push(['fetch.min.bytes', S.fetchMin], ['fetch.wait.max.ms', 500, 'Java name: fetch.max.wait.ms'],
     ['max.partition.fetch.bytes', msgBytes()], ['fetch.max.bytes', Math.max(52428800, msgBytes())],
     ['session.timeout.ms', S.sessionTimeout * 1000], ['heartbeat.interval.ms', Math.floor(S.sessionTimeout * 1000 / 3)],
-    ['max.poll.interval.ms', S.pollInterval * 60000], ['partition.assignment.strategy', ASSIGN[S.assign].rd], ...rdSec('consumer'));
+    ['max.poll.interval.ms', S.pollInterval * 60000], ['partition.assignment.strategy', ASSIGN[S.assign].rd]);
+  if (S.autoCommit) e.push(['auto.commit.interval.ms', S.commitEvery * 1000]);
+  if (S.txn) e.push(['isolation.level', 'read_committed']);
+  if (S.staticMember) e.push(['group.instance.id', `${group()}-1`, 'unique per instance']);
+  if (S.racks) e.push(['client.rack', 'zone-1', "this app's zone"]);
+  e.push(...rdSec('consumer'));
   return e;
 }
 const dictLines = (entries, q, ind, cmt, bools) => entries.map(([k, v, note]) =>
@@ -1326,7 +1363,7 @@ function goFile() {
 function springFile() {
   const t = topic(), L = ['# application.yml for Spring Boot (spring-kafka)',
     'spring:', '  kafka:', `    bootstrap-servers: ${hostList(9092).join(',')}`,
-    '    producer:', `      acks: ${S.acks}`];
+    '    producer:', `      acks: ${S.acks}`, ...(S.txn ? [`      transaction-id-prefix: ${topic()}-tx-`] : [])];
   if (S.acks !== '0') L.push(`      retries: ${S.retries === 'max' ? 2147483647 : S.retries}`);
   L.push(`      batch-size: ${S.batch}KB`, `      compression-type: ${S.compression}`,
     '      key-serializer: org.apache.kafka.common.serialization.StringSerializer',
@@ -1335,7 +1372,7 @@ function springFile() {
     `        max.request.size: ${msgBytes()}`);
   if (S.acks !== '0') L.push(`        delivery.timeout.ms: ${S.deliveryTimeout * 1000}`, `        request.timeout.ms: ${S.requestTimeout * 1000}`,
     `        retry.backoff.ms: ${S.retryBackoff}`, `        retry.backoff.max.ms: ${Math.max(1000, S.retryBackoff)}`);
-  L.push(`        max.in.flight.requests.per.connection: ${S.maxInFlight}`, `        max.block.ms: ${S.maxBlock * 1000}`,
+  L.push(`        max.in.flight.requests.per.connection: ${S.maxInFlight}`, `        max.block.ms: ${S.maxBlock * 1000}`, `        buffer.memory: ${S.bufferMB * 1048576}`,
     '    consumer:', `      group-id: ${group()}`, `      auto-offset-reset: ${S.reset}`, `      enable-auto-commit: ${S.autoCommit}`,
     `      max-poll-records: ${S.maxPoll}`, `      fetch-min-size: ${S.fetchMin === 1 ? '1B' : '64KB'}`, '      fetch-max-wait: 500ms',
     '      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer',
@@ -1343,7 +1380,9 @@ function springFile() {
     '      properties:', `        max.partition.fetch.bytes: ${msgBytes()}`, `        fetch.max.bytes: ${Math.max(52428800, msgBytes())}`,
     `        session.timeout.ms: ${S.sessionTimeout * 1000}`, `        heartbeat.interval.ms: ${Math.floor(S.sessionTimeout * 1000 / 3)}`,
     `        max.poll.interval.ms: ${S.pollInterval * 60000}`,
-    `        partition.assignment.strategy: org.apache.kafka.clients.consumer.${ASSIGN[S.assign].java}`);
+    `        partition.assignment.strategy: org.apache.kafka.clients.consumer.${ASSIGN[S.assign].java}`,
+    ...(S.txn ? ['        isolation.level: read_committed'] : []), ...(S.staticMember ? [`        group.instance.id: ${group()}-1  # unique per instance`] : []),
+    ...(S.racks ? ['        client.rack: zone-1'] : []));
   if (!S.autoCommit) L.push('    listener:', '      # Commit after your @KafkaListener has handled each poll\'s messages', '      ack-mode: batch');
   L.push('', '# Failed messages: add this bean to a @Configuration class.',
     '# @Bean', '# DefaultErrorHandler errorHandler(KafkaTemplate<Object, Object> template) {');
@@ -1389,10 +1428,11 @@ function composeFile() {
       `      KAFKA_REPLICA_FETCH_MAX_BYTES: ${msgBytes()}`,
       `      KAFKA_REPLICA_LAG_TIME_MAX_MS: ${S.replicaLag * 1000}`,
       '      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"',
-      '      KAFKA_UNCLEAN_LEADER_ELECTION_ENABLE: "false"');
+      '      KAFKA_UNCLEAN_LEADER_ELECTION_ENABLE: "false"',
+      ...(S.racks ? [`      KAFKA_BROKER_RACK: zone-${(id - 1) % 3 + 1}`, '      KAFKA_REPLICA_SELECTOR_CLASS: org.apache.kafka.common.replica.RackAwareReplicaSelector'] : []));
   }
   L.push('', '# When the brokers are up, create the topic:',
-    `# docker compose exec kafka1 /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka1:9092 --create --topic ${topic()} --partitions ${S.partitions} --replication-factor ${S.rf} --config min.insync.replicas=${S.minIsr}${S.cleanup === 'compact' ? ' --config cleanup.policy=compact' : ''}`);
+    `# docker compose exec kafka1 /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka1:9092 --create --topic ${topic()} --partitions ${S.partitions} --replication-factor ${S.rf} --config min.insync.replicas=${S.minIsr}${S.cleanup === 'compact' ? ' --config cleanup.policy=compact' : ''}${topicExtras()}`);
   return L.join('\n');
 }
 const FILES = {
@@ -1469,6 +1509,14 @@ const IMPORT = {
   'fetch.min.bytes': ['fetchMin', v => size(v) <= 1 ? 1 : 65536],
   'session.timeout.ms': ['sessionTimeout', v => num(v) / 1000],
   'max.poll.interval.ms': ['pollInterval', v => num(v) / 60000],
+  'transactional.id': ['txn', v => !!String(v).trim()],
+  'isolation.level': ['txn', v => /read_committed/i.test(v)],
+  'group.instance.id': ['staticMember', v => !!String(v).trim()],
+  'client.rack': ['racks', v => !!String(v).trim()],
+  'broker.rack': ['racks', v => !!String(v).trim()],
+  'retention.bytes': ['retBytes', v => { const g = num(v) / 1073741824; return !(g > 0) ? 0 : g < 5 ? 1 : 10; }],
+  'buffer.memory': ['bufferMB', v => { const m = num(v) / 1048576; return m <= 48 ? 32 : m <= 96 ? 64 : 128; }],
+  'auto.commit.interval.ms': ['commitEvery', v => num(v) / 1000],
   'cleanup.policy': ['cleanup', v => /compact/i.test(v) ? 'compact' : 'delete'],
   'log.cleanup.policy': ['cleanup', v => /compact/i.test(v) ? 'compact' : 'delete'],
   'security.protocol': ['security', v => /sasl/i.test(v) ? 'sasl' : /ssl/i.test(v) ? 'tls' : 'none'],
@@ -1657,6 +1705,17 @@ function controlsHtml() {
       S.cleanup === 'compact' ? 'Watch the logs: crossed-out slots were removed because a newer message has the same key. Messages without a key are refused.' : '') +
     choice('security', 'How do apps connect to the brokers?', 'security.protocol', Object.entries(SEC).map(([v, x]) => ({ v, label: x.label, hint: x.hint })),
       S.security === 'none' ? '' : 'The files use the CA certificate at ' + CA + ' and the password change-me. Replace both before you deploy.') +
+    choice('retBytes', 'Also limit how much each partition keeps?', 'retention.bytes', [
+      { v: 0, label: 'No size limit', hint: 'Only the time above decides. Kafka’s default.' },
+      { v: 1, label: '1 GB per partition', hint: 'Protects small disks from a sudden flood' },
+      { v: 10, label: '10 GB per partition', hint: 'Room for busy topics' }], `The limit is per partition: with ${pl(S.partitions, 'partition')} and ${pl(S.rf, 'copy', 'copies')}, the topic can use up to ${S.retBytes ? S.retBytes * S.partitions * S.rf + ' GB' : 'as much as the time limit allows'} of disk.`) +
+    (S.cleanup === 'compact' ? choice('compactLag', 'Keep every message at least', 'min.compaction.lag.ms', [
+      { v: 0, label: 'No minimum', hint: 'Compaction may remove an older value right away' },
+      { v: 1, label: '1 hour', hint: 'Readers that are a little behind still see every change' },
+      { v: 24, label: '1 day', hint: 'Every change stays readable for a day' }]) : '') +
+    `<label class="switch q" ${rawTip('Spread copies across zones', 'Tell each broker which zone (data centre or availability zone) it runs in. Kafka then puts the copies of a partition in different zones, so losing a whole zone loses no data, and consumers can read from a copy in their own zone, which costs less network traffic.')}><input type="checkbox" id="racks" data-k="racks"${S.racks ? ' checked' : ''}>
+      <span class="txt"><span class="qlabel">Spread copies across zones${key('broker.rack')}</span>
+      <span class="help">Copies of a partition go to different zones, and consumers read from the copy in their own zone.</span></span></label>` +
     `<div class="note info">${ICON.info}<div>Try it: select a broker’s name in the diagram to switch it off and see which partitions keep working.</div></div>` +
     `<div class="sub"><h3>Limits and slow brokers</h3>` +
     choice('maxMsgMB', 'Largest single message', 'message.max.bytes', [
@@ -1673,6 +1732,9 @@ function controlsHtml() {
     `<label class="switch q" ${rawTip('Prevent duplicates (enable.idempotence)', 'Each message gets a sequence number, so if a confirmation is lost and the producer sends again, the broker drops the repeat. It also keeps retried batches in order. Needs acks=all and retries.')}><input type="checkbox" id="idem" data-k="idem"${S.idem ? ' checked' : ''}${S.acks !== 'all' || S.retries === '0' ? ' disabled' : ''}>
       <span class="txt"><span class="qlabel">Prevent duplicates when retrying${key('enable.idempotence')}</span>
       <span class="help">${S.acks !== 'all' ? 'Needs “All copies saved it” above.' : S.retries === '0' ? 'Needs retries. Turn retrying back on below.' : 'If a confirmation gets lost and the producer sends again, the broker drops the repeat.'}</span></span></label>` +
+    `<label class="switch q" ${rawTip('Exactly once (transactions)', 'Writes a group of messages, and the consumer position, as one transaction: all of it becomes visible or none of it does. Consumers set to read_committed never see aborted messages. Needs duplicate prevention.')}><input type="checkbox" id="txn" data-k="txn"${S.txn ? ' checked' : ''}${S.acks !== 'all' || S.retries === '0' ? ' disabled' : ''}>
+      <span class="txt"><span class="qlabel">Exactly once with transactions${key('transactional.id')}</span>
+      <span class="help">${S.acks !== 'all' || S.retries === '0' ? 'Needs “All copies saved it” and retries.' : 'All messages in a transaction appear together or not at all. Consumers read only committed ones.'}</span></span></label>` +
     range('linger', 'Wait to fill a batch', 'linger.ms', 0, 100, 5, 'ms', 'Waiting a few milliseconds lets many messages travel in one request.') +
     choice('batch', 'Largest batch per partition', 'batch.size', [
       { v: 16, label: '16 KB', hint: "Kafka's default" },
@@ -1705,6 +1767,9 @@ function controlsHtml() {
     choice('maxInFlight', 'Requests sent at once to each broker', 'max.in.flight.requests.per.connection', [
       { v: 5, label: 'Up to 5', hint: 'Faster. Order is kept when duplicate prevention is on.' },
       { v: 1, label: 'One at a time', hint: 'Slower. Order is always kept.' }]) +
+    choice('bufferMB', 'Memory for messages waiting to be sent', 'buffer.memory', [
+      { v: 32, label: '32 MB', hint: 'Kafka’s default' }, { v: 64, label: '64 MB', hint: 'Bursty traffic' }, { v: 128, label: '128 MB', hint: 'Very busy apps' }],
+      'When this fills up, for example while brokers are slow, send() waits up to the time below.') +
     range('maxBlock', 'How long send() may wait', 'max.block.ms', 1, 120, 1, 's', 'When the buffer is full or no broker can be reached, send() blocks this long, then throws an error in your code.') + '</div>';
   if (id === 'consumer') return intro('How your services read messages', 'Consumers that share a group name split the work: each partition is read by exactly one member of the group.') +
     `<div class="row2">${text('group', 'Consumer group name', 'group.id', 'Use one name per service. Two services with different names each get every message.')}
@@ -1713,12 +1778,16 @@ function controlsHtml() {
       `One consumer handles about ${Math.round(1000 / SPEED[S.speed].ms)} messages a second. If producers send more than the whole group can handle, lag grows.`) +
     choice('assign', 'How should a group share partitions between its consumers?', 'partition.assignment.strategy', Object.entries(ASSIGN).map(([v, a]) => ({ v, label: a.label, hint: a.hint })),
       'When a consumer joins, leaves or crashes, Kafka moves partitions between the rest: a rebalance. Watch the group box in the diagram when you add or remove a consumer.') +
+    `<label class="switch q" ${rawTip('Static membership', 'Give each consumer a fixed name. When it restarts, for example during a deploy, it gets the same partitions back without a rebalance, as long as it returns within the session timeout.')}><input type="checkbox" id="staticMember" data-k="staticMember"${S.staticMember ? ' checked' : ''}>
+      <span class="txt"><span class="qlabel">Keep partitions through restarts${key('group.instance.id')}</span>
+      <span class="help">A consumer that restarts within ${S.sessionTimeout} s gets its partitions back with no rebalance. Each instance needs its own name.</span></span></label>` +
     choice('reset', 'Where should a new group start reading?', 'auto.offset.reset', [
       { v: 'earliest', label: 'From the beginning', hint: 'Read everything still stored' },
       { v: 'latest', label: 'From now on', hint: 'Only messages sent after it starts' }]) +
     choice('autoCommit', 'When is a message marked as read?', 'enable.auto.commit', [
       { v: 'false', label: 'After my code handles it', hint: 'Recommended. Call commitSync() after processing.' },
-      { v: 'true', label: 'Automatically every 5 s', hint: 'Simpler. A crash can skip or repeat messages.' }]) +
+      { v: 'true', label: `Automatically every ${S.commitEvery} s`, hint: 'Simpler. A crash can skip or repeat messages.' }]) +
+    (S.autoCommit ? range('commitEvery', 'Commit automatically every', 'auto.commit.interval.ms', 1, 30, 1, 's', 'Shorter means fewer repeats after a crash, but more commit traffic.') : '') +
     range('maxPoll', 'Messages per poll', 'max.poll.records', 10, 1000, 10, 'max', 'How many messages your code gets each time it asks for more.') +
     choice('fetchMin', 'When should a fetch return?', 'fetch.min.bytes', [
       { v: 1, label: 'As soon as anything arrives', hint: 'Lowest delay' },
@@ -2097,7 +2166,7 @@ function drawMap() {
       <rect class="bchip${off ? ' off' : ''}" x="${x}" y="46" width="${cw}" height="42" rx="8"/>
       ${icoAt(off ? 'server-off' : 'server-2', x + 10, 59, 16, `rico ${off ? 'off-t' : 'r-b'}`)}
       <text class="lbl bn${off ? ' off-t' : ''}" x="${x + 32}" y="64">Broker ${b + 1}</text>
-      <text class="muted bs${off ? ' off-t' : ''}" x="${x + 32}" y="79">${off ? 'switched off' : `leads ${leads}`}</text></g>`;
+      <text class="muted bs${off ? ' off-t' : ''}" x="${x + 32}" y="79">${off ? 'switched off' : `leads ${leads}${S.racks ? ` · zone ${b % 3 + 1}` : ''}`}</text></g>`;
   }
   s += '</g>';
   // headings over the logs and the copies
