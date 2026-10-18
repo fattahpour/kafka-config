@@ -362,7 +362,8 @@ h1 { font-size: 15px; font-weight: 590; letter-spacing: -0.01em; line-height: 1;
 .tip { position: fixed; z-index: 60; max-width: 300px; padding: 9px 12px; border-radius: 8px; background: var(--ink); color: var(--paper); font-size: 13px; line-height: 1.45; box-shadow: 0 10px 30px rgba(8, 9, 10, .28); pointer-events: none; }
 .tip b { display: block; margin-bottom: 2px; font-weight: 650; }
 #map [data-tip], .legend [data-tip], .pcount[data-tip], .lag-groups [data-tip] { cursor: help; }
-#map .bhead, #map .ackseg, .pcount button { cursor: pointer; }
+#map [role="button"], #map .gctl, #map .gname, #map .partbtn, .pcount button, .lag-groups button { cursor: pointer; }
+#map .gctl.off { cursor: not-allowed; }
 .lagbox { display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 10px; background: var(--code-bg); font-size: 14px; }
 .lagbox:focus { outline: none; }
 .lag-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
@@ -683,15 +684,22 @@ const STEPS = [
 const PRESETS = {
   // The default: one of everything, so a newcomer sees the smallest working setup and grows it from the pipeline
   starter: { label: 'Getting started', hint: 'One producer, one broker, one consumer. Add more as you learn.',
-    producers: 1, brokers: 1, partitions: 3, rf: 1, minIsr: 1, retention: 7, maxMsgMB: 1, replicaLag: 30,
+    producers: 1, brokers: 1, partitions: 1, rf: 1, minIsr: 1, retention: 7, maxMsgMB: 1, replicaLag: 30,
     acks: 'all', idem: true, linger: 5, batch: 16, compression: 'lz4',
     retries: 'max', deliveryTimeout: 120, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
     consumers: 1, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', cleanup: 'delete', onFail: 'dlq' },
-  safe: { label: 'Never lose a message', hint: 'Payments, orders, anything you must not drop.',
+  safe: { label: 'Never lose a message', hint: 'Orders, bookings, anything you must not drop.',
     producers: 2, brokers: 3, partitions: 6, rf: 3, minIsr: 2, retention: 30, maxMsgMB: 1, replicaLag: 30,
     acks: 'all', idem: true, linger: 5, batch: 16, compression: 'lz4',
     retries: 'max', deliveryTimeout: 300, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
     consumers: 3, reset: 'earliest', autoCommit: false, maxPoll: 200, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', cleanup: 'delete', onFail: 'dlq' },
+  // Money: never lose, duplicate or reorder a payment for the same account. A failing payment is retried, not skipped,
+  // so later payments on that account wait behind it; a month of history allows audits and replays.
+  payments: { label: 'Payment system', hint: 'Payments and refunds. Never lose, duplicate or reorder a payment for one account.',
+    producers: 2, brokers: 3, partitions: 6, rf: 3, minIsr: 2, retention: 30, maxMsgMB: 1, replicaLag: 30,
+    acks: 'all', idem: true, linger: 0, batch: 16, compression: 'lz4',
+    retries: 'max', deliveryTimeout: 300, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
+    consumers: 3, reset: 'earliest', autoCommit: false, maxPoll: 100, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', cleanup: 'delete', onFail: 'retry' },
   balanced: { label: 'Balanced', hint: 'A safe starting point for most services.',
     producers: 2, brokers: 3, partitions: 6, rf: 3, minIsr: 2, retention: 7, maxMsgMB: 1, replicaLag: 30,
     acks: 'all', idem: true, linger: 10, batch: 64, compression: 'lz4',
@@ -834,6 +842,7 @@ const TI = {
   'circle': '<path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/>',
   'list': '<path d="M9 6l11 0"/><path d="M9 12l11 0"/><path d="M9 18l11 0"/><path d="M5 6l0 .01"/><path d="M5 12l0 .01"/><path d="M5 18l0 .01"/>',
   'arrows-shuffle': '<path d="M18 4l3 3l-3 3"/><path d="M18 20l3 -3l-3 -3"/><path d="M3 7h3a5 5 0 0 1 5 5a5 5 0 0 0 5 5h5"/><path d="M21 7h-5a4.978 4.978 0 0 0 -3 1m-4 8a4.984 4.984 0 0 1 -3 1h-3"/>',
+  'credit-card': '<path d="M3 8a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3l0 -8"/><path d="M3 10l18 0"/><path d="M7 15l.01 0"/><path d="M11 15l2 0"/>',
   'route': '<path d="M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M19 7a2 2 0 1 0 0 -4a2 2 0 0 0 0 4"/><path d="M11 19h5.5a3.5 3.5 0 0 0 0 -7h-8a3.5 3.5 0 0 1 0 -7h4.5"/>',
 };
 const ic = (n, size = 16) => `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TI[n]}</svg>`;
@@ -1602,7 +1611,7 @@ const intro = (h, p) => `<div class="intro"><h2 id="step-h" tabindex="-1">${h}</
 function controlsHtml() {
   const id = STEPS[step].id;
   if (id === 'goal') return intro('What is this topic for?', 'Pick the closest match. It fills in sensible settings for every step, and you can change any of them later.') +
-    choice('goal', 'Kind of data', '', Object.entries(PRESETS).map(([v, p]) => ({ v, label: p.label, hint: p.hint, icon: { starter: 'route', safe: 'shield-check', balanced: 'scale', bulk: 'stack-2', fast: 'bolt', jobs: 'list-check', iot: 'cpu', cdc: 'database', audit: 'history' }[v] }))) +
+    choice('goal', 'Kind of data', '', Object.entries(PRESETS).map(([v, p]) => ({ v, label: p.label, hint: p.hint, icon: { starter: 'route', safe: 'shield-check', payments: 'credit-card', balanced: 'scale', bulk: 'stack-2', fast: 'bolt', jobs: 'list-check', iot: 'cpu', cdc: 'database', audit: 'history' }[v] }))) +
     (isCustom() ? `<div class="note info">${ICON.info}<div>You changed some settings after picking “${PRESETS[S.goal].label}”. Pick it again to reset them.</div></div>` : '') +
     `<div class="row2">${text('topic', 'Topic name', '', 'Lowercase words with dashes or dots work best.')}
       ${text('host', 'Broker host name prefix', '', `Brokers will be named ${esc(hostPrefix())}1, ${esc(hostPrefix())}2 and so on.`)}</div>` +
@@ -1861,7 +1870,7 @@ function geom() {
   // each group's box: name, settings row, then its consumers; 12px gap between boxes
   const blockH = gs.map(g => g.consumers * 40 + 62), consH = blockH.reduce((a, b) => a + b, 0);
   const bodyH = Math.max(P * rowH, consH, N * 52 + 104, 140);
-  const gy0 = []; blockH.reduce((y, h) => { gy0.push(y); return y + h; }, top + (bodyH - consH) / 2);
+  const gy0 = []; blockH.reduce((y, h) => { gy0.push(y); return y + h; }, top);  // anchored at the top: a box's buttons stay put while it grows
   SLOTS = multi ? 11 : 12;
   const tx = 262, sw = 25, tEnd = tx + SLOTS * sw, rx = tEnd + (multi ? 84 : 58);
   const own = gs.map((gr, g) => assignOwners(P, gr.consumers, S.assign, G && G.own && G.own[g]));
@@ -2073,9 +2082,7 @@ function drawMap() {
   }
   s += '</g>';
   // headings over the logs and the copies
-  s += `<g aria-hidden="true"><g data-tip="topic">${iconLabel((tx + tEnd) / 2, 28, `Topic ${esc(topic())}`, 'stack-2', 'lbl', 400)}</g>
-    <text class="muted" x="${tx}" y="${top - 12}">older</text><text class="muted" x="${tEnd}" y="${top - 12}" text-anchor="end">newest ▸</text></g>
-    <g class="zone z-b" aria-hidden="true"><text class="muted" x="${rx}" y="${top - 12}">copies</text></g>`;
+  s += `<g aria-hidden="true"><g data-tip="topic">${iconLabel((tx + tEnd) / 2, 28, `Topic ${esc(topic())}`, 'stack-2', 'lbl', 400)}</g></g>`;
   // one row per partition: its log, its copies, and the track to the consumers
   s += '<g aria-hidden="true">';
   for (const st of G.parts) {
@@ -2589,7 +2596,18 @@ function tipText(key) {
   return null;
 }
 const tip = $('tip');
-let tipEl = null, tipTimer = 0, tipByFocus = false, tipNext = null;
+let tipEl = null, tipTimer = 0, tipByFocus = false, tipNext = null, tipMuted = null, tipAnchored = false;
+// the diagram redraws after a click, so a control is recognised by what it is, not by its element
+const tipId = el => [el.dataset.tip, el.dataset.gctl, el.dataset.b, el.dataset.acks, el.dataset.g, el.id].join('|');
+const isClickable = el => el.matches('button, [role="button"], label, select, input, .pcount, .pselect') || !!el.querySelector('button, input, select');
+function showTipAbove(el) {
+  showTip(el, 0, 0); if (tip.hidden) return;
+  tipAnchored = true;
+  const r = el.getBoundingClientRect(), t = tip.getBoundingClientRect();
+  let left = Math.min(Math.max(8, r.left + r.width / 2 - t.width / 2), innerWidth - t.width - 8), top = r.top - t.height - 8;
+  if (top < 8) top = r.bottom + 8;
+  tip.style.left = left + 'px'; tip.style.top = top + 'px';
+}
 function placeTip(x, y) {
   const r = tip.getBoundingClientRect();
   let left = x + 14, top = y + 18;
@@ -2601,36 +2619,44 @@ const plain = h => String(h ?? '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').
 const rawTip = (title, body) => `data-tip="raw" data-tip-title="${esc(plain(title))}" data-tip-body="${esc(plain(body))}"`;
 const tipFor = el => el.dataset.tip === 'raw' ? (el.dataset.tipBody ? [esc(el.dataset.tipTitle), esc(el.dataset.tipBody)] : null) : tipText(el.dataset.tip);
 function showTip(el, x, y) {
+  tipAnchored = false;
   const t = tipFor(el); if (!t) return;
   tip.innerHTML = `<b>${t[0]}</b>${t[1]}`; tip.hidden = false; tipEl = el;
   placeTip(x, y);
 }
-function hideTip() { clearTimeout(tipTimer); tip.hidden = true; tipByFocus = false; tipNext = null; if (tipEl) tipEl.removeAttribute('aria-describedby'); tipEl = null; }
+function hideTip() { clearTimeout(tipTimer); tip.hidden = true; tipByFocus = false; tipNext = null; tipAnchored = false; if (tipEl) tipEl.removeAttribute('aria-describedby'); tipEl = null; }
 document.addEventListener('pointerover', e => {
   const el = e.target.closest && e.target.closest('[data-tip]');
   // the logs slide under a still pointer, so moving between parts of the same item must not restart the delay
-  if (el && (el === tipEl || el === tipNext)) return;
+  if (el && (el === tipEl || el === tipNext || (tipMuted && tipId(el) === tipMuted))) return;
   if (!el) { hideTip(); return; }
   clearTimeout(tipTimer); tipNext = el;
-  const x = e.clientX, y = e.clientY, quick = !tip.hidden;
-  tipTimer = setTimeout(() => { tipNext = null; showTip(el, x, y); }, quick ? 0 : 200);
+  // controls you click wait longer and sit above the control, so they never cover the buttons next to it
+  const click = isClickable(el), x = e.clientX, y = e.clientY, quick = !tip.hidden && !click;
+  tipTimer = setTimeout(() => { tipNext = null; click ? showTipAbove(el) : showTip(el, x, y); }, quick ? 0 : click ? 650 : 200);
 });
 document.addEventListener('pointermove', e => {
-  if (!tipEl) return;
+  // a clicked control stays quiet until the mouse really moves to something else (not when the diagram moves under it)
+  if (tipMuted && (e.movementX || e.movementY)) { const el = e.target.closest && e.target.closest('[data-tip]'); if (!el || tipId(el) !== tipMuted) tipMuted = null; }
+  if (!tipEl || tipAnchored) return;
   if (!tipEl.isConnected) { hideTip(); return; }
   placeTip(e.clientX, e.clientY);
 });
+// clicking closes the tooltip, and it stays closed until the pointer moves to something else
+document.addEventListener('pointerdown', e => {
+  const el = e.target.closest && e.target.closest('[data-tip]');
+  hideTip(); tipMuted = el ? tipId(el) : null;
+}, true);
 document.addEventListener('focusin', e => {
   const el = e.target.closest && e.target.closest('[data-tip]');
   if (!el || !e.target.matches(':focus-visible')) { hideTip(); return; }
-  const r = el.getBoundingClientRect();
-  showTip(el, r.left, r.bottom - 10); el.setAttribute('aria-describedby', 'tip'); tipByFocus = true;
+  showTipAbove(el); el.setAttribute('aria-describedby', 'tip'); tipByFocus = true;
 });
 document.addEventListener('focusout', hideTip);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') hideTip(); });
 // a tooltip opened by the mouse closes on scroll; one opened by keyboard focus follows its element
 addEventListener('scroll', () => {
-  if (tipByFocus && tipEl && tipEl.isConnected) { const r = tipEl.getBoundingClientRect(); placeTip(r.left, r.bottom - 10); } else hideTip();
+  if (tipByFocus && tipEl && tipEl.isConnected) showTipAbove(tipEl); else hideTip();
 }, { passive: true });
 
 /* ---------- Render & events ---------- */

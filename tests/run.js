@@ -64,6 +64,7 @@ test('every kind of data answers every question', async () => {
 
 test('partitioner matches Kafka murmur2 and modulo', async () => {
   const page = await open();
+  await page.click('#pb-partitions-inc'); await page.click('#pb-partitions-inc');  // the vectors below are checked against 3 partitions
   for (const [key, h] of Object.entries(MURMUR2)) {
     const expected = (h & 0x7fffffff) % 3;
     const got = await page.evaluate(k => window.__kp.partitionFor(k), key);
@@ -155,6 +156,7 @@ test('partition assignment follows Kafka assignors, and sticky moves the fewest'
   const load = a => [0, 1, 2].map(j => a.filter(x => x === j).length);
   assert(Math.max(...load(sticky3)) - Math.min(...load(sticky3)) <= 1, 'sticky result is unbalanced: ' + JSON.stringify(sticky3));
   // a rebalance shows in the diagram and the files name the strategy
+  await page.click('#pb-partitions-inc'); await page.click('#pb-partitions-inc'); await page.waitForTimeout(100);
   await page.click('#pb-consumers-inc'); await page.waitForTimeout(100);
   assert(await page.$('.rbadge'), 'no rebalancing badge after adding a consumer');
   await page.waitForTimeout(2200);
@@ -244,6 +246,27 @@ test('compaction crosses out older messages per key; security reaches every file
     ['kafka-client.js', "'security.protocol': 'sasl_ssl'"], ['kafka_client.go', '"ssl.ca.location"'], ['application.yml', 'protocol: SASL_SSL']];
   const miss = need.filter(([n, x]) => !f[n].includes(x)).map(([n, x]) => `${n}: ${x}`);
   assert(!miss.length, 'missing in files: ' + miss.join(' | '));
+  noErrors(page); await page.context().close();
+});
+
+test('buttons look clickable and their tooltips never cover them', async () => {
+  const page = await open();
+  await page.click('#pb-groups-inc'); await page.click('#play'); await page.waitForTimeout(300);
+  for (const sel of ['[data-gctl="cons:0:1"]', '[data-gctl="speed:1"]', '.gname[data-g="0"]', '.partbtn', '.bhead[data-b="0"]', '.ackseg[data-acks="1"]']) {
+    const el = await page.$(sel); await el.scrollIntoViewIfNeeded();
+    assert(await el.evaluate(e => getComputedStyle(e).cursor) === 'pointer', `${sel} does not show the hand cursor`);
+    const b = await el.boundingBox();
+    await page.mouse.move(0, 0); await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 2 });
+    await page.waitForTimeout(250);
+    assert(await page.evaluate(() => document.getElementById('tip').hidden), `${sel}: tooltip appeared too fast for a button`);
+    await page.waitForTimeout(700);
+    const t = await page.evaluate(() => { const t = document.getElementById('tip'); return t.hidden ? null : t.getBoundingClientRect().toJSON(); });
+    assert(t, `${sel}: no tooltip after waiting`);
+    const overlaps = !(t.right <= b.x || t.left >= b.x + b.width || t.bottom <= b.y || t.top >= b.y + b.height);
+    assert(!overlaps, `${sel}: tooltip covers the button`);
+    await page.mouse.down(); await page.mouse.up(); await page.waitForTimeout(900);
+    assert(await page.evaluate(() => document.getElementById('tip').hidden), `${sel}: tooltip should close on click and stay closed`);
+  }
   noErrors(page); await page.context().close();
 });
 
