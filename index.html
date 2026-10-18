@@ -81,6 +81,9 @@ body {
 *, *::before, *::after { box-sizing: border-box; }
 /* hidden always wins, even over components that set their own display */
 [hidden] { display: none !important; }
+/* dropdown lists are drawn by the browser: give them the theme's colours, or dark mode shows white text on white */
+select { color-scheme: inherit; }
+select, select option, select optgroup { background-color: var(--surface); color: var(--ink); }
 :focus-visible { outline: 2px solid var(--role); outline-offset: 2px; }
 ::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 
@@ -563,7 +566,7 @@ textarea.field { max-width: none; min-height: 150px; font-family: var(--mono); f
 .fname .ic { color: var(--role); }
 .pbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-bottom: 10px; border-bottom: 1px solid var(--rule); }
 .pselect { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding-left: 10px; border: 1px solid var(--rule-2); border-radius: 8px; background: var(--surface); color: var(--muted); }
-.pselect select { height: 36px; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 13.5px; font-weight: 510; padding: 0 8px 0 2px; cursor: pointer; border-radius: 0 8px 8px 0; }
+.pselect select { height: 36px; border: 0; background: var(--surface); color: var(--ink); font: inherit; font-size: 13.5px; font-weight: 510; padding: 0 8px 0 2px; cursor: pointer; border-radius: 0 8px 8px 0; }
 .pselect:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 .pselect select:focus-visible { outline: none; }
 .pcount { display: inline-flex; align-items: center; gap: 1px; height: 36px; padding: 0 2px 0 8px; border: 1px solid var(--rule-2); border-radius: 8px; background: var(--surface); font-size: 13px; font-weight: 510; }
