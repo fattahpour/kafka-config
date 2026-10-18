@@ -326,6 +326,30 @@ h1 { font-size: 15px; font-weight: 590; letter-spacing: -0.01em; line-height: 1;
 .sharerow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
 .sharerow label { width: 40px; font-weight: 590; font-size: 13.5px; }
 .sharerow .field { flex: 1 1 260px; max-width: none; font-family: var(--mono); font-size: 12px; }
+.stage-head #chal-btn { min-height: 38px; }
+.chal { display: grid; gap: 12px; padding: 14px 16px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--rule)); background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
+.chal:focus { outline: none; }
+.chal-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.chal-head .ic { color: var(--accent); align-self: center; }
+.chal-head span { color: var(--ink-2); font-size: 14px; flex: 1 1 320px; }
+.chal-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 8px; }
+.chal-pick { width: 100%; height: 100%; display: flex; gap: 10px; align-items: flex-start; text-align: left; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
+.chal-pick:hover { border-color: var(--accent); }
+.chal-pick .ic { color: var(--accent); margin-top: 2px; }
+.chal-pick b { display: block; font-size: 14px; font-weight: 590; }
+.chal-pick small { display: block; color: var(--muted); font-size: 12.5px; line-height: 1.45; margin-top: 2px; }
+.chal-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+.chal-checks li { display: flex; gap: 8px; align-items: flex-start; color: var(--ink-2); }
+.chal-checks .ic { color: var(--muted); margin-top: 1px; }
+.chal-checks li.ok { color: var(--ink); }
+.chal-checks li.ok .ic { color: var(--ok); }
+.chal-hint, .chal-win { display: flex; gap: 10px; align-items: flex-start; margin: 0; padding: 10px 12px; border-radius: 8px; font-size: 14px; }
+.chal-hint { background: color-mix(in srgb, var(--warn) 9%, var(--surface)); }
+.chal-hint .ic { color: var(--warn); flex: none; margin-top: 2px; }
+.chal-win { background: color-mix(in srgb, var(--ok) 11%, var(--surface)); border: 1px solid color-mix(in srgb, var(--ok) 35%, var(--rule)); }
+.chal-win .ic { color: var(--ok); flex: none; }
+.chal-win p { margin: 0; }
+.chal-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .tip { position: fixed; z-index: 60; max-width: 300px; padding: 9px 12px; border-radius: 8px; background: var(--ink); color: var(--paper); font-size: 13px; line-height: 1.45; box-shadow: 0 10px 30px rgba(8, 9, 10, .28); pointer-events: none; }
 .tip b { display: block; margin-bottom: 2px; font-weight: 650; }
 #map [data-tip], .legend [data-tip], .pcount[data-tip], .lag-groups [data-tip] { cursor: help; }
@@ -597,7 +621,8 @@ textarea.field { max-width: none; min-height: 150px; font-family: var(--mono); f
     </header>
 
     <section class="stage" aria-label="Live diagram of your Kafka setup">
-      <div class="stage-head"><h2><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M19 7a2 2 0 1 0 0 -4a2 2 0 0 0 0 4"/><path d="M11 19h5.5a3.5 3.5 0 0 0 0 -7h-8a3.5 3.5 0 0 1 0 -7h4.5"/></svg>Pipeline</h2><span class="pgoal" id="pgoal"></span><span class="live"><i aria-hidden="true"></i>Live</span></div>
+      <div class="stage-head"><h2><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M19 7a2 2 0 1 0 0 -4a2 2 0 0 0 0 4"/><path d="M11 19h5.5a3.5 3.5 0 0 0 0 -7h-8a3.5 3.5 0 0 1 0 -7h4.5"/></svg>Pipeline</h2><span class="pgoal" id="pgoal"></span><button type="button" class="link-btn" id="chal-btn" data-tip="chal" aria-expanded="false" aria-controls="chal"></button><span class="live"><i aria-hidden="true"></i>Live</span></div>
+      <div class="chal" id="chal" hidden tabindex="-1" aria-label="Challenge"></div>
       <div class="pbar" id="pbar" role="toolbar" aria-label="Change the pipeline"></div>
       <p class="scroll-hint">Swipe sideways to see the whole diagram.</p>
       <div class="stage-scroll"><svg id="map" role="group" viewBox="0 0 1000 400"></svg></div>
@@ -789,6 +814,12 @@ const TI = {
   'sun': '<path d="M8 12a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7"/>',
   'moon': '<path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454l0 .008"/>',
   'device-desktop': '<path d="M3 5a1 1 0 0 1 1 -1h16a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1v-10"/><path d="M7 20h10"/><path d="M9 16v4"/><path d="M15 16v4"/>',
+  'flag': '<path d="M5 5a5 5 0 0 1 7 0a5 5 0 0 0 7 0v9a5 5 0 0 1 -7 0a5 5 0 0 0 -7 0v-9"/><path d="M5 21v-7"/>',
+  'trophy': '<path d="M8 21l8 0"/><path d="M12 17l0 4"/><path d="M7 4l10 0"/><path d="M17 4v8a5 5 0 0 1 -10 0v-8"/><path d="M3 9a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M17 9a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/>',
+  'bulb': '<path d="M3 12h1m8 -9v1m8 8h1m-15.4 -6.4l.7 .7m12.1 -.7l-.7 .7"/><path d="M9 16a5 5 0 1 1 6 0a3.5 3.5 0 0 0 -1 3a2 2 0 0 1 -4 0a3.5 3.5 0 0 0 -1 -3"/><path d="M9.7 17l4.6 0"/>',
+  'circle': '<path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/>',
+  'list': '<path d="M9 6l11 0"/><path d="M9 12l11 0"/><path d="M9 18l11 0"/><path d="M5 6l0 .01"/><path d="M5 12l0 .01"/><path d="M5 18l0 .01"/>',
+  'arrows-shuffle': '<path d="M18 4l3 3l-3 3"/><path d="M18 20l3 -3l-3 -3"/><path d="M3 7h3a5 5 0 0 1 5 5a5 5 0 0 0 5 5h5"/><path d="M21 7h-5a4.978 4.978 0 0 0 -3 1m-4 8a4.984 4.984 0 0 1 -3 1h-3"/>',
   'route': '<path d="M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M19 7a2 2 0 1 0 0 -4a2 2 0 0 0 0 4"/><path d="M11 19h5.5a3.5 3.5 0 0 0 0 -7h-8a3.5 3.5 0 0 1 0 -7h4.5"/>',
 };
 const ic = (n, size = 16) => `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TI[n]}</svg>`;
@@ -1903,6 +1934,7 @@ function detectRebalance(oldOwn, oldGroups) {
     const moved = new Set(G.own[g].map((j, p) => (before[p] !== undefined && before[p] !== j ? p : -1)).filter(p => p >= 0));
     if (!moved.size) return;
     rebal[g] = { until: now + 1800, moved, eager: S.assign !== 'sticky' };
+    if (S.assign === 'sticky') chalSeen.sticky = true;
     announce(`Rebalancing ${gr.name}: ${pl(moved.size, 'partition')} ${moved.size > 1 ? 'move' : 'moves'} to another consumer.`);
   });
 }
@@ -2054,12 +2086,14 @@ function statusText() {
 // Lag = messages saved (committed) but not yet handled by a group. A trend over the last few seconds tells
 // a passing burst (normal) from a group that cannot keep up (needs a fix).
 const lagHist = [];
-let lagSig = '', lagOpen = false;
+let lagSig = '', lagOpen = false, lagOkSince = 0;
 const groupLag = g => logs.reduce((a, L) => a + Math.max(0, L.hw - (L.cons[g] ?? L.hw)), 0);
 function sampleLag() {
   G.gs.forEach((_, g) => { const h = lagHist[g] = lagHist[g] || []; h.push(groupLag(g)); if (h.length > 6) h.shift(); });
   lagHist.length = G.gs.length;
+  if (lagTrend(0) === 'growing' || (lagHist[0] || []).length < 4) lagOkSince = performance.now();
   renderLag();
+  if (chal) renderChal();
   // keep an open tooltip's live numbers (offsets, lag) current
   if (tipEl && !tip.hidden && tipEl.isConnected) { const t = tipText(tipEl.dataset.tip); if (t) tip.innerHTML = `<b>${t[0]}</b>${t[1]}`; }
 }
@@ -2267,6 +2301,111 @@ $('explain').addEventListener('input', e => {
   out.innerHTML = v ? hashLine(v) : '';
 });
 
+/* ---------- Challenges ---------- */
+// Each one sets up a problem, checks the answer live, and explains why the fix works
+const chalSeen = { sticky: false };
+const CHALLENGES = [
+  { id: 'survive', icon: 'server-off', title: 'Survive a broker failure',
+    intro: 'Each message lives on one broker, so a crash loses data. Make the topic keep every saved message, and keep accepting writes, when any one broker fails.',
+    setup: { goal: 'starter', brokers: 3, partitions: 3, rf: 1, minIsr: 1, acks: '1', idem: false },
+    checks: [['Each message is stored on 3 brokers (Copies = 3)', () => S.rf >= 3],
+      ['The producer waits for every in-sync copy (acks=all)', () => S.acks === 'all'],
+      ['Writes need 2 copies, so one broker can be down (min.insync.replicas = 2)', () => S.minIsr >= 2 && S.minIsr <= S.rf - 1],
+      ['Switch a broker off: every partition still accepts writes', () => down.size >= 1 && parts().every(p => p.writable)]],
+    hint: 'Raise Copies to 3 in the toolbar, then set acks to “all” under the producers. On the Cluster step, set “Copies that must confirm a write” to 2. Finally click a broker card to switch it off.',
+    why: 'With 3 copies and min.insync.replicas=2, Kafka confirms a write only when 2 brokers have it. Losing any one broker loses nothing, and the remaining 2 copies still meet the minimum, so writes go on.' },
+  { id: 'lag', icon: 'route', title: 'Stop the lag from growing',
+    intro: 'Four apps now send to the topic, and one consumer cannot keep up: its lag grows every second. Keep all four producers, and make the lag stop growing.',
+    setup: { goal: 'starter', producers: 4, partitions: 3, consumers: 1, speed: 'normal' },
+    checks: [['Keep at least 4 producers sending', () => S.producers >= 4],
+      ['The animation is playing', () => running],
+      ['Lag stays steady or shrinks for 8 seconds', () => running && performance.now() - lagOkSince >= 8000]],
+    hint: 'Use the lag panel under the diagram: add consumers (up to one per partition), then partitions, or make handling faster. The fix buttons there change the setup for you.',
+    why: 'Lag grows when a group handles fewer messages per second than the producers send. More consumers, more partitions to spread them over, or cheaper handling raise how fast the group reads.' },
+  { id: 'order', icon: 'list', title: 'Keep each customer’s orders in order',
+    intro: 'Orders for the same customer must be handled in the order they were placed. Right now they can arrive shuffled.',
+    setup: { goal: 'starter', acks: '1', idem: false, maxInFlight: 5, retries: 'max', onFail: 'dlq', keys: [] },
+    checks: [['Messages carry a key, such as the customer ID', () => S.keys.length > 0],
+      ['A retry can never overtake a newer message', () => (S.idem && S.acks === 'all') || S.maxInFlight === 1],
+      ['A failing message is retried, not skipped', () => S.onFail === 'retry']],
+    hint: 'On the Producer step, add a key under “Message keys”, choose “All copies saved it” and turn on duplicate prevention. On the Consumer step, pick “Stop and retry it”.',
+    why: 'The same key always lands in the same partition, and a partition is read in order. Idempotence keeps retried batches in order, and retrying a failed message instead of skipping it keeps later ones behind it.' },
+  { id: 'replay', icon: 'history', title: 'Replay history for a new service',
+    intro: 'A new search service needs every order from the last month. Messages are only kept for a day, and a new group would start from now.',
+    setup: { goal: 'starter', retention: 1, reset: 'latest', more: [] },
+    checks: [['Keep messages for 30 days', () => S.retention >= 30],
+      ['Add a second consumer group for the new service', () => S.more.length >= 1],
+      ['New groups start from the beginning', () => S.reset === 'earliest']],
+    hint: 'On the Cluster step keep messages 30 days. Add a group with the Groups counter. On the Consumer step choose “From the beginning”.',
+    why: 'Kafka keeps messages after they are read, for as long as retention says. A new group has its own position, so with auto.offset.reset=earliest it replays everything still stored without disturbing other groups.' },
+  { id: 'sticky', icon: 'arrows-shuffle', title: 'Scale with fewer pauses',
+    intro: 'Every time a consumer joins, the whole group stops reading while partitions move. Grow the group to 4 consumers without stopping everyone.',
+    setup: { goal: 'starter', partitions: 6, consumers: 2, assign: 'range' },
+    checks: [['Share partitions with cooperative sticky', () => S.assign === 'sticky'],
+      ['Grow the group to 4 consumers', () => S.consumers >= 4],
+      ['See a rebalance where only moved partitions pause', () => chalSeen.sticky]],
+    hint: 'On the Consumer step pick “Cooperative sticky”, then add consumers with + in the group box or the toolbar. Watch the blinking dots: only those partitions pause.',
+    why: 'Range and round-robin are eager: every consumer gives up its partitions during a rebalance. Cooperative sticky keeps partitions where they are and moves only what balance needs, so the rest keep being read.' },
+];
+let chal = null;
+const chalBtn = () => $('chal-btn'), chalBox = () => $('chal');
+function syncChalBtn() {
+  const b = chalBtn(); if (!b) return;
+  b.innerHTML = ic('flag') + (chal ? 'Challenge on' : 'Challenges');
+  b.setAttribute('aria-expanded', String(!chalBox().hidden));
+}
+function startChallenge(id) {
+  const c = CHALLENGES.find(x => x.id === id); if (!c) return;
+  const base = PRESETS[c.setup.goal];
+  PKEYS.forEach(k => { S[k] = base[k]; });
+  Object.assign(S, c.setup); down.clear(); chalSeen.sticky = false; lagHist.length = 0; lagOkSince = performance.now();
+  if (id === 'lag' && !running && !reduce) { running = true; syncPlay(); }
+  chal = { id, done: false };
+  normalize(); save(); renderAll();
+  announce(`Challenge: ${c.title}. ${c.intro}`);
+  chalBox().focus({ preventScroll: true });
+}
+function renderChal() {
+  const box = chalBox(); if (!box || box.hidden) { syncChalBtn(); return; }
+  if (!chal) {
+    box.innerHTML = `<div class="chal-head">${ic('flag')}<b>Challenges</b><span>Each one sets up a problem. Fix it with the controls; the checklist turns green as you go.</span></div>
+      <ul class="chal-list">${CHALLENGES.map(c => `<li><button type="button" class="chal-pick" data-chal="${c.id}" data-tip="chal-start:${c.id}">${ic(c.icon, 18)}<span><b>${c.title}</b><small>${c.intro}</small></span></button></li>`).join('')}</ul>`;
+  } else {
+    const c = CHALLENGES.find(x => x.id === chal.id), ok = c.checks.map(([, f]) => !!f()), all = ok.every(Boolean);
+    if (all && !chal.done) { chal.done = true; announce(`Challenge complete: ${c.title}.`); }
+    const sig = chal.id + ok.join() + chal.done + !!chal.hint;
+    if (box.dataset.sig === sig) return;
+    box.dataset.sig = sig;
+    box.innerHTML = `<div class="chal-head">${ic(c.icon)}<b>${c.title}</b><span>${c.intro}</span></div>
+      <ol class="chal-checks">${c.checks.map(([t], i) => `<li class="${ok[i] ? 'ok' : ''}">${ic(ok[i] ? 'circle-check' : 'circle', 18)}<span>${t}</span></li>`).join('')}</ol>
+      ${chal.done ? `<div class="chal-win">${ic('trophy', 20)}<p><b>Solved.</b> ${c.why}</p></div>` : chal.hint ? `<p class="chal-hint">${ic('bulb')}<span>${c.hint}</span></p>` : ''}
+      <div class="chal-actions">
+        ${chal.done ? (() => { const nx = CHALLENGES[(CHALLENGES.indexOf(c) + 1) % CHALLENGES.length]; return `<button type="button" class="btn primary" data-chal="${nx.id}" data-tip="chal-start:${nx.id}">${ic('arrow-right')}Next: ${nx.title}</button>`; })()
+          : `<button type="button" class="btn" data-chal-act="hint" data-tip="chal-hint" aria-expanded="${!!chal.hint}">${ic('bulb')}${chal.hint ? 'Hide hint' : 'Show a hint'}</button>`}
+        <button type="button" class="btn" data-chal="${c.id}" data-tip="chal-restart">${ic('refresh')}Start over</button>
+        <button type="button" class="btn" data-chal-act="list" data-tip="chal-list">${ic('list')}All challenges</button>
+        <button type="button" class="btn" data-chal-act="close" data-tip="chal-close">${ic('x')}Leave</button></div>`;
+    if (chal.done && motionOK()) gsap.from(box.querySelector('.chal-win'), { scale: .92, opacity: 0, duration: M.base, ease: M.pop });
+  }
+  syncChalBtn();
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('#chal-btn')) {
+    const box = chalBox(); box.hidden = !box.hidden; delete box.dataset.sig; renderChal();
+    if (!box.hidden) box.focus({ preventScroll: true });
+    return;
+  }
+  const pick = e.target.closest('[data-chal]');
+  if (pick) { startChallenge(pick.dataset.chal); return; }
+  const act = e.target.closest('[data-chal-act]'); if (!act) return;
+  const a = act.dataset.chalAct, box = chalBox();
+  if (a === 'hint') chal.hint = !chal.hint;
+  if (a === 'list') chal = null;
+  if (a === 'close') { chal = null; box.hidden = true; }
+  delete box.dataset.sig; renderChal();
+  if (!box.hidden) { const f = box.querySelector(a === 'hint' ? '[data-chal-act="hint"]' : 'button'); f && f.focus(); } else chalBtn().focus();
+});
+
 /* ---------- Tooltips ---------- */
 // Every part of the pipeline explains itself on hover or keyboard focus. The text is built when it is shown,
 // so it always matches the live diagram (offsets, lag, which consumer owns which partition).
@@ -2311,6 +2450,12 @@ function tipText(key) {
     }
     case 'rebal': return ['Rebalancing', S.assign === 'sticky' ? 'Kafka is moving some partitions to other consumers. With cooperative sticky, only the partitions that move pause; the rest keep being read.'
       : `Kafka is moving partitions between this group’s consumers. With ${ASSIGN[S.assign].label.toLowerCase()} assignment, every consumer in the group stops reading until it is done.`];
+    case 'chal': return ['Challenges', 'Short missions: each sets up a problem and checks your fix live, then explains why it works.'];
+    case 'chal-start': { const c = CHALLENGES.find(x => x.id === a); return c ? [c.title, `Start this challenge. It replaces the current setup with the problem. ${c.intro}`] : null; }
+    case 'chal-hint': return ['Hint', 'Shows which controls to change, without changing them for you.'];
+    case 'chal-restart': return ['Start over', 'Puts the challenge’s starting setup back.'];
+    case 'chal-list': return ['All challenges', 'Back to the list of challenges. Your current setup stays as it is.'];
+    case 'chal-close': return ['Leave', 'Close the challenge. Your current setup stays as it is.'];
     case 'groups': return ['Consumer groups', 'Each group reads every message on its own and keeps its own position, so a slow group never holds back a fast one. Inside a group, each partition is read by exactly one consumer.'];
     case 'leg': return {
       prod: ['Producer', 'Your app writing messages to the topic.'], 'role-broker': ['Broker', 'A Kafka server that stores copies of partitions.'],
@@ -2398,6 +2543,7 @@ function renderBar() {
 $('pgoal').addEventListener('change', e => { if (e.target.id === 'pb-goal') { set('goal', e.target.value); $('pb-goal').focus(); } });
 function renderNav() {
   renderBar();
+  if (typeof renderChal === 'function' && chalBox()) renderChal();
   if (!shareBox.hidden) syncShare();
   const w = checks();
   // the header pill counts the same warnings as the step badges, so it refreshes with them

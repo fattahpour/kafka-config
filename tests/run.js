@@ -194,6 +194,39 @@ test('a shared link or code restores the same setup', async () => {
   noErrors(p3); await p3.context().close();
 });
 
+test('every challenge can be solved with the controls', async () => {
+  const page = await open({ settle: 2600 });
+  const start = async id => { if (await page.$('#chal[hidden]')) await page.click('#chal-btn'); if (await page.$('[data-chal-act="list"]')) await page.click('[data-chal-act="list"]'); await page.click(`.chal-pick[data-chal="${id}"]`); await page.waitForTimeout(150); };
+  const solved = async id => { await page.waitForTimeout(300); assert(await page.$('.chal-win'), `challenge "${id}" not marked solved; open checks: ` + (await page.$$eval('.chal-checks li:not(.ok)', l => l.map(x => x.textContent).join(' | ')))); };
+  const tile = (k, v) => page.click(`input[name="${k}"][value="${v}"]`, { force: true });
+  const step = n => page.click(`.steps button[data-goto="${n}"]`);
+
+  await start('survive'); assert(!(await page.$('.chal-win')), 'survive: solved before doing anything');
+  await page.click('#pb-rf-inc'); await page.click('#pb-rf-inc'); await page.click('.ackseg[data-acks="all"]');
+  await step(1); await page.click('#minIsr-inc'); await page.click('.bhead[data-b="0"]'); await solved('survive');
+
+  await start('order'); await step(2);
+  await page.fill('#newKey', 'customer-9'); await page.click('[data-act="addkey"]');
+  await tile('acks', 'all'); if (!(await page.isChecked('#idem'))) await page.click('#idem', { force: true });
+  await step(3); await tile('onFail', 'retry'); await solved('order');
+
+  await start('replay'); await step(1); await tile('retention', '30'); await page.click('#pb-groups-inc');
+  await step(3); await tile('reset', 'earliest'); await solved('replay');
+
+  await start('sticky'); await step(3); await tile('assign', 'sticky');
+  await page.click('#pb-consumers-inc'); await page.waitForTimeout(200); await page.click('#pb-consumers-inc'); await solved('sticky');
+
+  await start('lag'); await page.waitForTimeout(6000);
+  assert(!(await page.$('.chal-win')), 'lag: solved before fixing anything');
+  for (let i = 0; i < 8 && !(await page.$('.chal-win')); i++) {
+    const ids = await page.$$eval('[data-lagfix]:not([disabled])', a => a.map(x => x.dataset.lagfix));
+    if (ids.length) await page.click(`[data-lagfix="${ids.find(x => x.startsWith('fast')) || ids[0]}"]`);
+    await page.waitForTimeout(5000);
+  }
+  await page.waitForTimeout(9000); await solved('lag');
+  noErrors(page); await page.context().close();
+});
+
 test('theme switch cycles and is remembered', async () => {
   const page = await open();
   const theme = () => page.evaluate(() => document.documentElement.getAttribute('data-theme') || 'auto');
