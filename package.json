@@ -1,7 +1,18 @@
 {
   "name": "kafka-config",
+  "version": "1.0.0",
   "private": true,
   "description": "Interactive Kafka producer, broker and consumer configuration guide",
+  "author": {
+    "name": "Sam Fattahpour",
+    "url": "https://www.linkedin.com/in/fattahpour"
+  },
+  "license": "MIT",
+  "homepage": "https://fattahpour.github.io/kafka-config/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fattahpour/kafka-config.git"
+  },
   "scripts": {
     "test": "node tests/run.js",
     "test:kafka": "bash tests/kafka-smoke.sh",
@@ -11,6 +22,5 @@
   "devDependencies": {
     "darkreader": "^4.9.133",
     "playwright-core": "1.58.2"
-  },
-  "version": "1.0.0"
+  }
 }

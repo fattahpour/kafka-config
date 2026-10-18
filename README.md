@@ -109,7 +109,17 @@ bash scripts/deploy-artifactory.sh
 - The generated cluster uses Kafka 3.9, so the new consumer rebalance protocol (`group.protocol=consumer`, Kafka 4.0) is not offered.
 - Security files use placeholders (`/etc/kafka/certs/ca.pem`, password `change-me`) that you replace before deploying.
 
-## Licences and trademarks
+## Author
+
+Made by **Sam Fattahpour** · [LinkedIn](https://www.linkedin.com/in/fattahpour) · [GitHub](https://github.com/fattahpour)
+
+Issues and suggestions are welcome on the [GitHub repository](https://github.com/fattahpour/kafka-config/issues).
+
+## License
+
+[MIT](LICENSE) © 2026 [Sam Fattahpour](https://github.com/fattahpour)
+
+## Third-party licences and trademarks
 
 Icons are from [Tabler Icons](https://tabler.io/icons) (MIT). The Kafka logo is the version published on kafka.apache.org (Apache License 2.0) and is used only as a link to the project, following the [ASF trademark policy](https://www.apache.org/foundation/marks/). See the `THIRD_PARTY_LICENSE-*.txt` files.
 
