@@ -83,7 +83,7 @@ test('every button, input and select has a tooltip', async () => {
     await page.click(`.steps button[data-goto="${st}"]`); await page.waitForTimeout(150);
     (await page.evaluate(() => [...document.querySelectorAll('button, input, select, textarea, [role="button"]')]
       .filter(el => el.getClientRects().length && !el.closest('[hidden]') && el.type !== 'hidden')
-      .filter(el => { const t = el.closest('[data-tip]'); return !t || !window.__kp.tipText(t.dataset.tip); })
+      .filter(el => { const t = el.closest('[data-tip]'); return !t || !window.__kp.tipFor(t); })
       .map(el => (el.id || el.getAttribute('aria-label') || el.name || el.textContent.trim().slice(0, 30) || el.tagName))))
       .forEach(x => missing.add(`step ${st}: ${x}`));
   }
@@ -94,7 +94,7 @@ test('every button, input and select has a tooltip', async () => {
 test('every diagram tooltip key has text', async () => {
   const page = await open();
   await page.click('#pb-groups-inc'); await page.click('#pb-groups-inc'); await page.waitForTimeout(200);
-  const bad = await page.evaluate(() => [...new Set([...document.querySelectorAll('[data-tip]')].map(e => e.dataset.tip))].filter(k => !window.__kp.tipText(k)));
+  const bad = await page.evaluate(() => [...new Set([...document.querySelectorAll('[data-tip]')].map(e => e.dataset.tip))].filter(k => k !== 'raw' && !window.__kp.tipText(k)));
   assert(!bad.length, 'tooltip keys without text: ' + bad.join(', '));
   noErrors(page); await page.context().close();
 });

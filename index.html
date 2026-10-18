@@ -605,7 +605,7 @@ textarea.field { max-width: none; min-height: 150px; font-family: var(--mono); f
         <circle cx="29" cy="30" r="3.6" fill="var(--surface)" stroke="var(--consumer)" stroke-width="2.6"/>
       </svg>
       <h1>Kafka Pilot</h1>
-      <button type="button" class="theme-btn" id="theme"></button>
+      <button type="button" class="theme-btn" id="theme" data-tip="theme"></button>
     </div>
     <nav class="steps" aria-label="Setup steps"><p class="side-label">Setup</p><span class="rail" id="rail" aria-hidden="true"></span><ol id="steps"></ol></nav>
     <p class="side-foot"><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/></svg>Every answer redraws the diagram and rewrites the config files. Nothing leaves this page.</p>
@@ -644,7 +644,7 @@ textarea.field { max-width: none; min-height: 150px; font-family: var(--mono); f
           <li data-tip="leg:ack"><svg width="12" height="12" aria-hidden="true"><circle class="sw-a" cx="6" cy="6" r="4"/></svg>Confirmation (ack)</li>
           <li data-tip="leg:err"><svg width="12" height="12" aria-hidden="true"><circle class="sw-e" cx="6" cy="6" r="5"/></svg>Refused write (error)</li>
         </ul>
-        <button type="button" class="link-btn" id="play">Pause animation</button>
+        <button type="button" class="link-btn" id="play" data-tip="play">Pause animation</button>
       </div>
     </section>
 
@@ -654,8 +654,8 @@ textarea.field { max-width: none; min-height: 150px; font-family: var(--mono); f
     </div>
 
     <div class="pager">
-      <button type="button" class="btn" id="back"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l14 0"/><path d="M5 12l6 6"/><path d="M5 12l6 -6"/></svg>Back</button>
-      <button type="button" class="btn primary" id="next">Next</button>
+      <button type="button" class="btn" id="back" data-tip="back"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l14 0"/><path d="M5 12l6 6"/><path d="M5 12l6 -6"/></svg>Back</button>
+      <button type="button" class="btn primary" id="next" data-tip="next">Next</button>
     </div>
   </main>
 </div>
@@ -1386,7 +1386,7 @@ const preId = name => 'pre-' + name.replace(/[^a-z0-9]/gi, '-');
 function fileBlock(name) {
   const f = FILES[name];
   return `<div class="file" data-r="${f.r}"><div class="file-head"><div class="fname">${ic('file-code')}<b>${name}</b> <span>${f.where}</span></div>
-    <button type="button" class="link-btn" data-copy="${name}">${ic('copy')}<span>Copy</span></button></div><pre tabindex="0" id="${preId(name)}">${highlight(f.make(), f.mode)}</pre></div>`;
+    <button type="button" class="link-btn" data-copy="${name}" data-tip="copyfile:${name}">${ic('copy')}<span>Copy</span></button></div><pre tabindex="0" id="${preId(name)}">${highlight(f.make(), f.mode)}</pre></div>`;
 }
 
 /* ---------- Import an existing config ---------- */
@@ -1538,12 +1538,12 @@ const key = k => k ? ` <code class="key">${k}</code>` : '';
 const help = h => h ? `<p class="help">${h}</p>` : '';
 function choice(k, label, code, opts, h) {
   return `<fieldset class="q"><legend class="qlabel">${label}${key(code)}</legend>${help(h)}<div class="tiles">${opts.map(o =>
-    `<label class="tile"><input type="radio" name="${k}" id="${k}-${o.v}" data-k="${k}" value="${o.v}"${String(S[k]) === String(o.v) ? ' checked' : ''}${o.off ? ' disabled' : ''}>
+    `<label class="tile" ${rawTip(o.label, `${o.hint}${o.off ? ' Not available with the current answers.' : ''}${code ? ` Sets ${code}${o.code && o.code.includes('=') ? ` (${o.code})` : ''}.` : ''}`)}><input type="radio" name="${k}" id="${k}-${o.v}" data-k="${k}" value="${o.v}"${String(S[k]) === String(o.v) ? ' checked' : ''}${o.off ? ' disabled' : ''}>
       ${o.icon ? `<span class="ti">${ic(o.icon, 18)}</span>` : ''}<b>${o.label}</b>${o.code ? `<code class="key">${o.code}</code>` : ''}<span>${o.hint}</span></label>`).join('')}</div></fieldset>`;
 }
 function stepper(k, label, code, min, max, h) {
   return `<div class="q stepq"><div class="qlabel" id="${k}-lbl">${label}${key(code)}</div>
-    <div class="stepper" role="group" aria-labelledby="${k}-lbl">
+    <div class="stepper" role="group" aria-labelledby="${k}-lbl" ${rawTip(label, `${h ? h + ' ' : ''}Use − and + to change it, from ${min} to ${max}.${code ? ` Sets ${code}.` : ''}`)}>
       <button type="button" id="${k}-dec" data-step="${k}" data-d="-1" aria-label="Decrease"${S[k] <= min ? ' disabled' : ''}>${ic('minus', 18)}</button>
       <output id="${k}-out" aria-live="polite">${S[k]}</output>
       <button type="button" id="${k}-inc" data-step="${k}" data-d="1" aria-label="Increase"${S[k] >= max ? ' disabled' : ''}>${ic('plus', 18)}</button>
@@ -1551,26 +1551,26 @@ function stepper(k, label, code, min, max, h) {
 }
 function range(k, label, code, min, max, st, fmt, h) {
   return `<div class="q"><label class="qlabel" for="${k}">${label}${key(code)}</label>${help(h)}
-    <div class="range"><input type="range" id="${k}" data-k="${k}" min="${min}" max="${max}" step="${st}" value="${S[k]}" data-fmt="${fmt}">
+    <div class="range" ${rawTip(label, `${h ? h + ' ' : ''}Drag or use the arrow keys: ${min} to ${max} ${fmt}.${code ? ` Sets ${code}.` : ''}`)}><input type="range" id="${k}" data-k="${k}" min="${min}" max="${max}" step="${st}" value="${S[k]}" data-fmt="${fmt}">
     <output id="${k}-out" for="${k}">${S[k]} ${fmt}</output></div></div>`;
 }
 function text(k, label, code, h) {
   const err = fieldError(k);
   return `<div class="q"><label class="qlabel" for="${k}">${label}${key(code)}</label>${help(h)}
-    <input class="field" type="text" id="${k}" data-k="${k}" value="${esc(S[k])}" spellcheck="false" autocomplete="off" aria-describedby="${k}-err"${err ? ' aria-invalid="true"' : ''}>
+    <input class="field" type="text" ${rawTip(label, `${h || ''}${code ? ` Sets ${code}.` : ''}`)} id="${k}" data-k="${k}" value="${esc(S[k])}" spellcheck="false" autocomplete="off" aria-describedby="${k}-err"${err ? ' aria-invalid="true"' : ''}>
     <p class="field-error" id="${k}-err"${err ? '' : ' hidden'}>${err}</p></div>`;
 }
 function groupsHtml() {
   return `<div class="sub"><h3>Other consumer groups</h3><p class="help after">Each group gets its own copy of every message and keeps its own read position, so a slow group never holds back a fast one. Use one group per service that needs this data.</p>` +
     S.more.map((gr, i) => `<div class="gcard g${i + 1}"><div class="row2">
-      <div class="q"><label class="qlabel" for="gname-${i}">Group name ${key('group.id')}</label><input class="field" type="text" id="gname-${i}" data-gname="${i}" value="${esc(gr.name)}" spellcheck="false" autocomplete="off"></div>
-      <div class="q stepq"><div class="qlabel" id="gc-${i}-lbl">Consumers</div><div class="stepper" role="group" aria-labelledby="gc-${i}-lbl">
+      <div class="q"><label class="qlabel" for="gname-${i}">Group name ${key('group.id')}</label><input class="field" type="text" ${rawTip('Group name (group.id)', 'Consumers that share this name split the partitions. A different name is a separate group that gets every message again.')} id="gname-${i}" data-gname="${i}" value="${esc(gr.name)}" spellcheck="false" autocomplete="off"></div>
+      <div class="q stepq"><div class="qlabel" id="gc-${i}-lbl">Consumers</div><div class="stepper" role="group" aria-labelledby="gc-${i}-lbl" ${rawTip('Consumers in this group', `Use − and + to change it, from 1 to 8. Up to ${S.partitions} can work at once, one per partition.`)}>
         <button type="button" id="gc-${i}-dec" data-gstep="${i}" data-d="-1" aria-label="Decrease"${gr.consumers <= 1 ? ' disabled' : ''}>${ic('minus', 18)}</button>
         <output aria-live="polite">${gr.consumers}</output>
         <button type="button" id="gc-${i}-inc" data-gstep="${i}" data-d="1" aria-label="Increase"${gr.consumers >= 8 ? ' disabled' : ''}>${ic('plus', 18)}</button></div></div></div>
-      <div class="q"><label class="qlabel" for="gspeed-${i}">Time to handle one message</label><select class="field" id="gspeed-${i}" data-gspeed="${i}">${Object.entries(SPEED).map(([v, sp]) => `<option value="${v}"${gr.speed === v ? ' selected' : ''}>${sp.label}: ${sp.hint}</option>`).join('')}</select></div>
-      <div><button type="button" class="btn" id="gdel-${i}" data-gdel="${i}">${ic('x')}Remove this group</button></div></div>`).join('') +
-    (S.more.length < 2 ? `<div><button type="button" class="btn" id="gadd" data-gadd>${ic('plus')}Add a consumer group</button></div>` : '<p class="help after">This tool shows up to 3 groups.</p>') + '</div>';
+      <div class="q"><label class="qlabel" for="gspeed-${i}">Time to handle one message</label><select class="field" ${rawTip('Time to handle one message', 'How long this group’s code spends on each message. Slower handling means fewer messages per second per consumer, so lag can grow.')} id="gspeed-${i}" data-gspeed="${i}">${Object.entries(SPEED).map(([v, sp]) => `<option value="${v}"${gr.speed === v ? ' selected' : ''}>${sp.label}: ${sp.hint}</option>`).join('')}</select></div>
+      <div><button type="button" class="btn" id="gdel-${i}" data-gdel="${i}" ${rawTip('Remove this group', 'Stops this group from reading the topic. The other groups are not affected.')}>${ic('x')}Remove this group</button></div></div>`).join('') +
+    (S.more.length < 2 ? `<div><button type="button" class="btn" id="gadd" data-gadd ${rawTip('Add a consumer group', 'Another service reading the same topic. It gets every message and keeps its own read position.')}>${ic('plus')}Add a consumer group</button></div>` : '<p class="help after">This tool shows up to 3 groups.</p>') + '</div>';
 }
 const GROUP_NAMES = ['analytics', 'search-indexer', 'audit-archive'];
 function addGroup() {
@@ -1600,9 +1600,9 @@ function controlsHtml() {
       <div class="q"><label class="qlabel" for="importText">Paste it to load and check it</label>
       <p class="help">Works with .properties files, Spring Boot application.yml and Docker KAFKA_ variables. Kafka Pilot fills in every step and points out combinations Kafka rejects.</p>
       <textarea class="field" id="importText" data-tip="import-text" spellcheck="false" autocomplete="off" placeholder="acks=all&#10;linger.ms=10&#10;group.id=orders-service">${esc(importText)}</textarea>
-      <div class="actions"><button type="button" class="btn primary" data-act="import">${ic('file-import')}Load and check</button>
-      <button type="button" class="btn" data-act="example">${ic('bug')}Try a broken example</button></div>
-      ${savedText !== null ? `<p class="field-msg">The example replaced your text. <button type="button" class="link-btn" data-act="restore">Put my text back</button></p>` : ''}</div>
+      <div class="actions"><button type="button" class="btn primary" data-act="import" data-tip="act:import">${ic('file-import')}Load and check</button>
+      <button type="button" class="btn" data-act="example" data-tip="act:example">${ic('bug')}Try a broken example</button></div>
+      ${savedText !== null ? `<p class="field-msg">The example replaced your text. <button type="button" class="link-btn" data-act="restore" data-tip="act:restore">Put my text back</button></p>` : ''}</div>
       ${importReportHtml()}</div>`;
   if (id === 'cluster') return intro('Where messages are stored', 'Brokers are the servers that store messages. A topic is split into partitions, and each partition is copied to several brokers so one failure does not lose data.') +
     `<div class="row2">${stepper('brokers', 'How many brokers?', '', 1, 5, '3 is the usual minimum for production.')}
@@ -1632,7 +1632,7 @@ function controlsHtml() {
       { v: '0', label: 'Don’t wait', code: 'acks=0', hint: 'Fastest. Lost messages go unnoticed.' },
       { v: '1', label: 'The leader saved it', code: 'acks=1', hint: 'Fast. Lost if the leader crashes before copying.' },
       { v: 'all', label: 'All copies saved it', code: 'acks=all', hint: 'Safest. Kafka’s default since 3.0.' }]) +
-    `<label class="switch q"><input type="checkbox" id="idem" data-k="idem"${S.idem ? ' checked' : ''}${S.acks !== 'all' || S.retries === '0' ? ' disabled' : ''}>
+    `<label class="switch q" ${rawTip('Prevent duplicates (enable.idempotence)', 'Each message gets a sequence number, so if a confirmation is lost and the producer sends again, the broker drops the repeat. It also keeps retried batches in order. Needs acks=all and retries.')}><input type="checkbox" id="idem" data-k="idem"${S.idem ? ' checked' : ''}${S.acks !== 'all' || S.retries === '0' ? ' disabled' : ''}>
       <span class="txt"><span class="qlabel">Prevent duplicates when retrying${key('enable.idempotence')}</span>
       <span class="help">${S.acks !== 'all' ? 'Needs “All copies saved it” above.' : S.retries === '0' ? 'Needs retries. Turn retrying back on below.' : 'If a confirmation gets lost and the producer sends again, the broker drops the repeat.'}</span></span></label>` +
     range('linger', 'Wait to fill a batch', 'linger.ms', 0, 100, 5, 'ms', 'Waiting a few milliseconds lets many messages travel in one request.') +
@@ -1649,11 +1649,11 @@ function controlsHtml() {
     `<div class="sub"><h3>Message keys</h3>
       <p class="help">The key decides the partition. Messages with the same key always land in the same partition, so they stay in order. Add your own keys and watch where they go.</p>
       <div class="q"><label class="qlabel" for="newKey">Add a key</label>
-      <div class="addrow"><input class="field" id="newKey" type="text" maxlength="40" placeholder="order-1001" spellcheck="false" autocomplete="off" aria-describedby="key-msg">
-        <button type="button" class="btn" data-act="addkey">${ic('plus')}Add key</button></div>
+      <div class="addrow"><input class="field" ${rawTip('New key', 'Type a key, like an order or customer ID, then press Enter or Add key. You will see which partition it goes to.')} id="newKey" type="text" maxlength="40" placeholder="order-1001" spellcheck="false" autocomplete="off" aria-describedby="key-msg">
+        <button type="button" class="btn" data-act="addkey" data-tip="act:addkey">${ic('plus')}Add key</button></div>
       <p class="field-msg" id="key-msg" aria-live="polite">${esc(keyMsg)}</p></div>
-      ${S.keys.length ? `<ul class="chips">${S.keys.map((k, i) => `<li class="chip">${esc(k)} <small>P${partitionFor(k)}</small><button type="button" data-delkey="${i}" aria-label="Remove ${esc(k)}">${ic('x')}</button></li>`).join('')}</ul>` : ''}
-      <label class="switch q"><input type="checkbox" id="hotKey" data-k="hotKey"${S.hotKey ? ' checked' : ''}${S.keys.length ? '' : ' disabled'}>
+      ${S.keys.length ? `<ul class="chips">${S.keys.map((k, i) => `<li class="chip">${esc(k)} <small>P${partitionFor(k)}</small><button type="button" data-delkey="${i}" data-tip="delkey" aria-label="Remove ${esc(k)}">${ic('x')}</button></li>`).join('')}</ul>` : ''}
+      <label class="switch q" ${rawTip('One very busy key', 'Sends most messages with the first key, so you can see one partition and its consumer overloaded while the others idle.')}><input type="checkbox" id="hotKey" data-k="hotKey"${S.hotKey ? ' checked' : ''}${S.keys.length ? '' : ' disabled'}>
         <span class="txt"><span class="qlabel">Send most traffic with the first key</span>
         <span class="help">See what one very busy customer does to a single partition and its consumer.</span></span></label></div>` +
     `<div class="sub"><h3>When a send fails</h3>` +
@@ -1707,7 +1707,7 @@ function controlsHtml() {
 
 const ICON = { warn: ic('alert-triangle', 18), info: ic('info-circle', 18), ok: ic('circle-check', 18) };
 function noteHtml(c, withLink) {
-  return `<div class="note ${c.lvl}">${ICON[c.lvl]}<div><span class="sr">${c.lvl === 'warn' ? 'Warning: ' : 'Note: '}</span>${c.text}</div>${withLink ? `<button type="button" class="link-btn go" data-goto="${c.step}">Change in ${STEPS[c.step].name}</button>` : ''}</div>`;
+  return `<div class="note ${c.lvl}">${ICON[c.lvl]}<div><span class="sr">${c.lvl === 'warn' ? 'Warning: ' : 'Note: '}</span>${c.text}</div>${withLink ? `<button type="button" class="link-btn go" data-goto="${c.step}" data-tip="goto:${c.step}">Change in ${STEPS[c.step].name}</button>` : ''}</div>`;
 }
 
 /* ---------- Readout ---------- */
@@ -1762,7 +1762,7 @@ function hashVisual() {
       <li><b>The remainder is the partition.</b> For <code>${esc(k)}</code>: ${fmtN(h)} ÷ ${P} = ${fmtN(Math.floor(h / P))} with ${h % P} left over, so it goes to <b>P${h % P}</b>. Every message with this key does, which keeps them in order.</li>
     </ol>
     <ul class="hrows">${S.keys.map(x => `<li>${hashLine(x)}</li>`).join('')}</ul>
-    <label class="htry"><span>Try a key</span><input class="field" id="hash-try" type="text" maxlength="40" spellcheck="false" autocomplete="off" placeholder="order-1001"></label>
+    <label class="htry"><span>Try a key</span><input class="field" ${rawTip('Try a key', 'Type any key to see its hash, the remainder after dividing, and its partition.')} id="hash-try" type="text" maxlength="40" spellcheck="false" autocomplete="off" placeholder="order-1001"></label>
     <p class="hrows" id="hash-out" aria-live="polite"></p>
     <p class="small">Change the partition count and the remainders change, so keys move to other partitions. Messages without a key have no fixed partition: Kafka fills one partition with a batch, then moves to the next.</p></div>`;
 }
@@ -2153,7 +2153,7 @@ function sampleLag() {
   renderLag();
   if (chal) renderChal();
   // keep an open tooltip's live numbers (offsets, lag) current
-  if (tipEl && !tip.hidden && tipEl.isConnected) { const t = tipText(tipEl.dataset.tip); if (t) tip.innerHTML = `<b>${t[0]}</b>${t[1]}`; }
+  if (tipEl && !tip.hidden && tipEl.isConnected) { const t = tipFor(tipEl); if (t) tip.innerHTML = `<b>${t[0]}</b>${t[1]}`; }
 }
 function lagTrend(g) {
   if (!running) return 'paused';
@@ -2182,7 +2182,7 @@ function renderLag(force) {
     box.innerHTML = `<div class="lag-head">${ic('route')}<b>Consumer lag</b><span>messages saved but not yet handled</span></div>
       <ul class="lag-groups">${gs.map((gr, g) => `<li class="g${g}" data-tip="group:${g}"><i aria-hidden="true"></i><span class="lgn">${esc(gr.name)}</span><b id="lagv-${g}">${lag[g]}</b><span class="trend t-${tr[g]}">${arrow[tr[g]]}</span></li>`).join('')}</ul>` +
       (worst >= 0 ? `<div class="lag-fix"><p><b>${tr[worst] === 'growing' ? `Lag in “${esc(gs[worst].name)}” keeps growing.` : `“${esc(gs[worst].name)}” is far behind.`}</b> Its consumers handle fewer messages per second than the producers send. Try one of these, then watch the number:</p>
-        <ol>${lagFixes(worst).map(f => `<li><span>${f.text}</span><button type="button" class="btn" data-lagfix="${f.id}"${f.off ? ' disabled' : ''}>${ic('plus')}${f.btn}</button></li>`).join('')}</ol></div>`
+        <ol>${lagFixes(worst).map(f => `<li><span>${f.text}</span><button type="button" class="btn" data-lagfix="${f.id}"${f.off ? ' disabled' : ''} ${rawTip(f.btn, `${f.text} Click to apply it and watch the lag.`)}>${ic('plus')}${f.btn}</button></li>`).join('')}</ol></div>`
         : `<p class="lag-ok">${!running ? 'Play the animation to watch lag change.' : catching.length ? `${list(catching.map(n => `“${esc(n)}”`))} ${catching.length > 1 ? 'are' : 'is'} catching up: its consumers now handle more messages per second than the producers send.` : 'Lag rises with each burst and drops back. That is normal: consumers are keeping up.'}</p>`) +
       (offline ? `<p class="lag-ok">Partitions without a leader cannot be read, so their lag stays frozen until a broker comes back.</p>` : '') +
       `<details class="lag-more"${lagOpen ? ' open' : ''}><summary>How do I fix lag in production?</summary><ul>
@@ -2526,6 +2526,29 @@ function tipText(key) {
     }
     case 'rebal': return ['Rebalancing', S.assign === 'sticky' ? 'Kafka is moving some partitions to other consumers. With cooperative sticky, only the partitions that move pause; the rest keep being read.'
       : `Kafka is moving partitions between this group’s consumers. With ${ASSIGN[S.assign].label.toLowerCase()} assignment, every consumer in the group stops reading until it is done.`];
+    case 'step': { const st = STEPS[n]; if (!st) return null;
+      return [`Step ${n + 1}: ${st.name}`, { goal: 'Pick what the topic is for. It fills in sensible settings everywhere, and you can paste an existing config to check it.',
+        cluster: 'Brokers, partitions, copies, how long messages are kept, and how apps connect securely.',
+        producer: 'How your app sends: acks, batching, compression, keys and retries.',
+        consumer: 'How your services read: groups, where to start, commits, speed, sharing partitions and failures.',
+        files: 'The finished files for your language, ready to copy.' }[st.id]]; }
+    case 'goto': { const st = STEPS[n]; return st ? ['Change it', `Opens the ${st.name} step, where this setting lives.`] : null; }
+    case 'copyfile': return [`Copy ${esc(a)}`, 'Copies the whole file to your clipboard. Every setting in it has a comment saying what it does.'];
+    case 'play': return [running ? 'Pause animation' : 'Play animation', 'Starts or stops the moving messages. The diagram still updates when paused.'];
+    case 'back': return ['Back', step > 0 ? `Go back to ${STEPS[step - 1].name}.` : 'This is the first step.'];
+    case 'next': return step < STEPS.length - 1 ? [`Next: ${STEPS[step + 1].name}`, `Continue to step ${step + 2}.`] : ['Start over', 'Back to the first step. Your answers stay.'];
+    case 'theme': return ['Theme', { auto: 'Following your system (light or dark). Click for light.', light: 'Light. Click for dark.', dark: 'Dark. Click to follow your system.' }[document.documentElement.getAttribute('data-theme') || 'auto']];
+    case 'share': return ['Share setup', 'Get a link and a short code that open Kafka Pilot with exactly these answers.'];
+    case 'share-link': return ['Share link', 'Opens Kafka Pilot with this setup. Some sites drop the part after #; then use the code.'];
+    case 'share-code': return ['Setup code', 'Paste it into Import on the Goal step to load this setup.'];
+    case 'share-copy-link': return ['Copy link', 'Copies the share link to your clipboard.'];
+    case 'share-copy-code': return ['Copy code', 'Copies the setup code to your clipboard.'];
+    case 'import-text': return ['Paste a config', 'Paste producer, consumer or server .properties, Spring application.yml, KAFKA_ environment variables, or a setup code. Then press Load and check.'];
+    case 'act': return { import: ['Load and check', 'Reads the pasted settings into every step and points out combinations Kafka rejects or that lose data.'],
+      example: ['Try a broken example', 'Fills the box with a config that has real mistakes, so you can see what the check finds.'],
+      restore: ['Put my text back', 'Restores what you had typed before the example replaced it.'],
+      addkey: ['Add key', 'Adds the key to the list and shows which partition it goes to.'] }[a] || null;
+    case 'delkey': return ['Remove key', 'Removes this key from the examples.'];
     case 'chal': return ['Challenges', 'Short missions: each sets up a problem and checks your fix live, then explains why it works.'];
     case 'chal-start': { const c = CHALLENGES.find(x => x.id === a); return c ? [c.title, `Start this challenge. It replaces the current setup with the problem. ${c.intro}`] : null; }
     case 'chal-hint': return ['Hint', 'Shows which controls to change, without changing them for you.'];
@@ -2563,8 +2586,11 @@ function placeTip(x, y) {
   if (top + r.height > innerHeight - 8) top = Math.max(8, y - r.height - 14);
   tip.style.left = left + 'px'; tip.style.top = top + 'px';
 }
+const plain = h => String(h ?? '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+const rawTip = (title, body) => `data-tip="raw" data-tip-title="${esc(plain(title))}" data-tip-body="${esc(plain(body))}"`;
+const tipFor = el => el.dataset.tip === 'raw' ? (el.dataset.tipBody ? [esc(el.dataset.tipTitle), esc(el.dataset.tipBody)] : null) : tipText(el.dataset.tip);
 function showTip(el, x, y) {
-  const t = tipText(el.dataset.tip); if (!t) return;
+  const t = tipFor(el); if (!t) return;
   tip.innerHTML = `<b>${t[0]}</b>${t[1]}`; tip.hidden = false; tipEl = el;
   placeTip(x, y);
 }
@@ -2631,7 +2657,7 @@ function renderNav() {
   $('steps').innerHTML = STEPS.map((s, i) => {
     const n = w.filter(c => c.step === i && c.lvl === 'warn').length;
     const c = `var(--${s.role})`;
-    return `<li><button type="button" data-goto="${i}" style="--c:${c}"${i === step ? ' aria-current="step"' : ''}>
+    return `<li><button type="button" data-goto="${i}" data-tip="step:${i}" style="--c:${c}"${i === step ? ' aria-current="step"' : ''}>
       <span class="n">${i + 1}</span><span class="si">${ic(s.icon)}</span><span class="name">${s.name}</span>${n ? `<span class="badge" aria-label="${pl(n, 'warning')}">${n}</span>` : ''}</button></li>`;
   }).join('');
 }
@@ -2878,6 +2904,6 @@ if (document.fonts) document.fonts.ready.then(() => moveRail(false));
 playIntro();
 requestAnimationFrame(frame);
 // Test hook: only the automated tests (tests/run.js) set __KP_TEST__ to read state and tooltip text
-if (window.__KP_TEST__) window.__kp = { S: () => S, tipText, checks, partitionFor, groupLag, lagTrend, parts, assignOwners, G: () => G, files: () => Object.fromEntries(Object.entries(FILES).map(([n, f]) => [n, f.make()])) };
+if (window.__KP_TEST__) window.__kp = { S: () => S, tipText, tipFor, checks, partitionFor, groupLag, lagTrend, parts, assignOwners, G: () => G, files: () => Object.fromEntries(Object.entries(FILES).map(([n, f]) => [n, f.make()])) };
 })();
 </script>
