@@ -79,6 +79,8 @@ body {
   font-feature-settings: "cv01", "ss03"; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
 }
 *, *::before, *::after { box-sizing: border-box; }
+/* hidden always wins, even over components that set their own display */
+[hidden] { display: none !important; }
 :focus-visible { outline: 2px solid var(--role); outline-offset: 2px; }
 ::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 
@@ -184,10 +186,14 @@ h1 { font-size: 15px; font-weight: 590; letter-spacing: -0.01em; line-height: 1;
 .stage-scroll { overflow-x: auto; }
 #map { display: block; width: 100%; min-width: 660px; height: auto; }
 .scroll-hint { display: none; margin: 0; font-size: 14px; color: var(--muted); }
+.lanetabs { display: none; gap: 6px; flex-wrap: wrap; }
+.lanetabs button { min-height: 40px; padding: 4px 12px; border: 1px solid var(--rule-2); border-radius: 999px; background: var(--surface); color: var(--ink-2); font: inherit; font-size: 13px; font-weight: 510; cursor: pointer; }
+.lanetabs button[aria-pressed="true"] { border-color: var(--accent); color: var(--ink); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
 @media (max-width: 680px) {
   /* keep diagram labels at a readable size on phones; the diagram scrolls sideways instead */
   #map { min-width: 1000px; }
   .scroll-hint { display: block; }
+  .lanetabs { display: flex; }
 }
 #map text { font-family: var(--sans); fill: var(--ink); font-size: 13px; }
 #map .lbl { font-weight: 590; font-size: 13.5px; letter-spacing: -0.005em; }
@@ -554,15 +560,15 @@ textarea.field { max-width: none; min-height: 150px; font-family: var(--mono); f
 .stepper button, .chip button { display: inline-grid; place-items: center; }
 .fname { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
 .fname .ic { color: var(--role); }
-.pbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-bottom: 10px; border-bottom: 1px solid var(--rule); }
+.pbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-bottom: 10px; border-bottom: 1px solid var(--rule); }
 .pselect { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding-left: 10px; border: 1px solid var(--rule-2); border-radius: 8px; background: var(--surface); color: var(--muted); }
 .pselect select { height: 36px; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 13.5px; font-weight: 510; padding: 0 8px 0 2px; cursor: pointer; border-radius: 0 8px 8px 0; }
 .pselect:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 .pselect select:focus-visible { outline: none; }
-.pcount { display: inline-flex; align-items: center; gap: 2px; height: 38px; padding: 0 3px 0 10px; border: 1px solid var(--rule-2); border-radius: 8px; background: var(--surface); font-size: 13px; font-weight: 510; }
-.pcount .pct { margin: 0 4px 0 4px; color: var(--ink-2); }
+.pcount { display: inline-flex; align-items: center; gap: 1px; height: 36px; padding: 0 2px 0 8px; border: 1px solid var(--rule-2); border-radius: 8px; background: var(--surface); font-size: 13px; font-weight: 510; }
+.pcount .pct { margin: 0 2px 0 5px; color: var(--ink-2); }
 .pcount output { min-width: 2ch; text-align: center; font-weight: 650; font-variant-numeric: tabular-nums; }
-.pcount button { width: 30px; height: 30px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); cursor: pointer; display: inline-grid; place-items: center; }
+.pcount button { width: 26px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); cursor: pointer; display: inline-grid; place-items: center; }
 .pcount button:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 7%, transparent); }
 .pcount button:disabled { opacity: .35; cursor: not-allowed; }
 @media (pointer: coarse) { .pcount, .pselect { height: 44px; } .pcount button { width: 38px; height: 38px; } .pselect select { height: 42px; } }
@@ -627,7 +633,11 @@ textarea.field { max-width: none; min-height: 150px; font-family: var(--mono); f
       <div class="stage-head"><h2><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M19 7a2 2 0 1 0 0 -4a2 2 0 0 0 0 4"/><path d="M11 19h5.5a3.5 3.5 0 0 0 0 -7h-8a3.5 3.5 0 0 1 0 -7h4.5"/></svg>Pipeline</h2><span class="pgoal" id="pgoal"></span><button type="button" class="link-btn" id="chal-btn" data-tip="chal" aria-expanded="false" aria-controls="chal"></button><span class="live"><i aria-hidden="true"></i>Live</span></div>
       <div class="chal" id="chal" hidden tabindex="-1" aria-label="Challenge"></div>
       <div class="pbar" id="pbar" role="toolbar" aria-label="Change the pipeline"></div>
-      <p class="scroll-hint">Swipe sideways to see the whole diagram.</p>
+      <p class="scroll-hint">Swipe sideways to see the whole diagram, or jump to a section:</p>
+      <div class="lanetabs" role="group" aria-label="Jump to a section of the diagram">
+        <button type="button" data-lane="0" data-tip="lane:0" aria-pressed="true">Your apps · write</button>
+        <button type="button" data-lane="1" data-tip="lane:1" aria-pressed="false">Cluster · store</button>
+        <button type="button" data-lane="2" data-tip="lane:2" aria-pressed="false">Services · read</button></div>
       <div class="stage-scroll"><svg id="map" role="group" viewBox="0 0 1000 400"></svg></div>
       <p id="status" aria-live="polite"></p>
       <div class="lagbox" id="lagbox" tabindex="-1" aria-label="Consumer lag"></div>
@@ -1719,7 +1729,7 @@ function explainHtml() {
   const writes = writeTol ? `Writes keep working with up to ${pl(writeTol, 'broker')} down.` : (S.rf > 1 ? 'Writes stop if any broker holding a copy goes down.' : 'Writes stop while the broker holding a partition is down.');
   const ackText = { '0': 'The producer sends and moves on without waiting for any confirmation.',
     '1': 'The producer waits until the partition leader has saved each message.',
-    'all': `The producer waits until every in-sync copy has saved each message. If fewer than ${pl(S.minIsr, 'copy', 'copies')} are online, the write is refused rather than stored unsafely.` }[S.acks];
+    'all': `The producer waits until every in-sync copy has saved each message. ${S.minIsr > 1 ? `If fewer than ${pl(S.minIsr, 'copy', 'copies')} are online, the write is refused rather than stored unsafely.` : 'Only one copy has to confirm, so writes succeed while the leader is up.'}` }[S.acks];
   const batchText = S.linger ? `Messages wait up to ${S.linger} ms so several travel together, up to ${S.batch} KB per partition. Fewer, bigger requests mean more throughput for a small delay.` : 'Each message is sent the moment you produce it. Lowest delay, but many small requests.';
   const comp = { none: 'Batches are sent uncompressed.', lz4: 'Batches are compressed with lz4: fast, with good savings on text and JSON.', zstd: 'Batches are compressed with zstd: the smallest on the wire, for a little more CPU.', snappy: 'Batches are compressed with snappy: fast, a little larger than lz4.', gzip: 'Batches are compressed with gzip: small but slow. zstd is usually a better choice.' }[S.compression];
   const assign = Array.from({ length: C }, (_, j) => {
@@ -2549,6 +2559,7 @@ function tipText(key) {
       restore: ['Put my text back', 'Restores what you had typed before the example replaced it.'],
       addkey: ['Add key', 'Adds the key to the list and shows which partition it goes to.'] }[a] || null;
     case 'delkey': return ['Remove key', 'Removes this key from the examples.'];
+    case 'lane': return [['Your apps · write', 'Kafka cluster · store', 'Your services · read'][n], 'Scrolls the diagram to this section.'];
     case 'chal': return ['Challenges', 'Short missions: each sets up a problem and checks your fix live, then explains why it works.'];
     case 'chal-start': { const c = CHALLENGES.find(x => x.id === a); return c ? [c.title, `Start this challenge. It replaces the current setup with the problem. ${c.intro}`] : null; }
     case 'chal-hint': return ['Hint', 'Shows which controls to change, without changing them for you.'];
@@ -2894,6 +2905,21 @@ shareBox.addEventListener('click', e => {
 });
 syncShare();
 if (fromLink) { try { history.replaceState(null, '', '#' + STEPS[0].id); } catch (e) {} }
+
+// phones: the three section buttons scroll the wide diagram, and follow it as you swipe
+const laneX = () => [0, 206, G ? G.xR + 4 : 804];
+const scroller = document.querySelector('.stage-scroll'), laneBtns = [...document.querySelectorAll('[data-lane]')];
+document.querySelector('.lanetabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-lane]'); if (!b) return;
+  const k = map.getBoundingClientRect().width / 1000;
+  scroller.scrollTo({ left: laneX()[+b.dataset.lane] * k - 8, behavior: reduce ? 'auto' : 'smooth' });
+});
+scroller.addEventListener('scroll', () => {
+  const k = map.getBoundingClientRect().width / 1000, mid = (scroller.scrollLeft + scroller.clientWidth / 3) / k;
+  const end = scroller.scrollLeft >= scroller.scrollWidth - scroller.clientWidth - 2;
+  const i = end ? 2 : laneX().reduce((a, x, j) => (mid >= x ? j : a), 0);
+  laneBtns.forEach((b, j) => b.setAttribute('aria-pressed', String(j === i)));
+}, { passive: true });
 
 normalize();
 if (window.gsap) document.documentElement.classList.add('has-gsap');

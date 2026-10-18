@@ -203,7 +203,10 @@ test('every challenge can be solved with the controls', async () => {
 
   await start('survive'); assert(!(await page.$('.chal-win')), 'survive: solved before doing anything');
   await page.click('#pb-rf-inc'); await page.click('#pb-rf-inc'); await page.click('.ackseg[data-acks="all"]');
-  await step(1); await page.click('#minIsr-inc'); await page.click('.bhead[data-b="0"]'); await solved('survive');
+  await step(1); await page.click('#minIsr-inc'); await page.waitForTimeout(500);
+  // the broker cards may still be settling from the last change; click until broker 1 is really off
+  for (let i = 0; i < 3 && !(await page.$('.bhead[data-b="0"] .bchip.off')); i++) { await page.click('.bhead[data-b="0"]'); await page.waitForTimeout(300); }
+  await solved('survive');
 
   await start('order'); await step(2);
   await page.fill('#newKey', 'customer-9'); await page.click('[data-act="addkey"]');
