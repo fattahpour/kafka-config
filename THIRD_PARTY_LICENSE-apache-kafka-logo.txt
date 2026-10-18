@@ -1,0 +1,12 @@
+Apache Kafka logo (index.html: sidebar and footer)
+
+File:    kafka_logo--simple.png, embedded unchanged as a data URI
+Source:  https://github.com/apache/kafka-site/tree/asf-site/logos (as published on kafka.apache.org)
+License: Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+
+Trademark: Apache, Apache Kafka, Kafka and the Kafka logo are trademarks of the Apache Software
+Foundation. Following the ASF trademark policy (https://www.apache.org/foundation/marks/), the logo
+is used only as a hyperlink to the project website (https://kafka.apache.org/), with the ASF's
+recommended attribution, and without implying endorsement. Using the logo in any other way, for
+example as an icon inside the diagram or as this tool's own logo, needs written approval from the
+ASF (https://www.apache.org/foundation/marks/contact).
