@@ -141,6 +141,31 @@ test('a broker switched off refuses writes when too few copies remain', async ()
   noErrors(page); await page.context().close();
 });
 
+test('partition assignment follows Kafka assignors, and sticky moves the fewest', async () => {
+  const page = await open();
+  const own = (P, C, st, prev) => page.evaluate(a => window.__kp.assignOwners(...a), [P, C, st, prev]);
+  const eq = (a, b, msg) => assert(JSON.stringify(a) === JSON.stringify(b), `${msg}: got ${JSON.stringify(a)}, expected ${JSON.stringify(b)}`);
+  // RangeAssignor: contiguous blocks, the first P % C consumers get one more
+  eq(await own(3, 2, 'range'), [0, 0, 1], 'range 3 partitions / 2 consumers');
+  eq(await own(6, 4, 'range'), [0, 0, 1, 1, 2, 3], 'range 6/4');
+  eq(await own(6, 4, 'roundrobin'), [0, 1, 2, 3, 0, 1], 'round robin 6/4');
+  const before = await own(6, 2, 'range'), range3 = await own(6, 3, 'range'), sticky3 = await own(6, 3, 'sticky', before);
+  const moves = a => a.filter((j, p) => j !== before[p]).length;
+  assert(moves(sticky3) < moves(range3), `sticky moved ${moves(sticky3)} partitions, range ${moves(range3)}`);
+  const load = a => [0, 1, 2].map(j => a.filter(x => x === j).length);
+  assert(Math.max(...load(sticky3)) - Math.min(...load(sticky3)) <= 1, 'sticky result is unbalanced: ' + JSON.stringify(sticky3));
+  // a rebalance shows in the diagram and the files name the strategy
+  await page.click('#pb-consumers-inc'); await page.waitForTimeout(100);
+  assert(await page.$('.rbadge'), 'no rebalancing badge after adding a consumer');
+  await page.waitForTimeout(2200);
+  assert(!(await page.$('.rbadge')), 'rebalancing badge did not clear');
+  await page.click('.steps button[data-goto="3"]'); await page.click('input[name="assign"][value="sticky"]', { force: true });
+  await page.click('.steps button[data-goto="4"]'); await page.waitForTimeout(150);
+  const files = (await page.$$eval('.file pre', p => p.map(x => x.textContent))).join('\n');
+  assert(files.includes('partition.assignment.strategy=org.apache.kafka.clients.consumer.CooperativeStickyAssignor'), 'consumer.properties lacks the strategy');
+  noErrors(page); await page.context().close();
+});
+
 test('theme switch cycles and is remembered', async () => {
   const page = await open();
   const theme = () => page.evaluate(() => document.documentElement.getAttribute('data-theme') || 'auto');

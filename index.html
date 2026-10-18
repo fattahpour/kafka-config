@@ -296,6 +296,12 @@ h1 { font-size: 15px; font-weight: 590; letter-spacing: -0.01em; line-height: 1;
 .gctl:focus-visible rect { stroke: var(--gc); stroke-width: 2.5; }
 .gctl.off { opacity: .4; cursor: not-allowed; }
 #map text.gcount { font-size: 12.5px; font-weight: 650; }
+/* rebalance */
+.rbadge rect { fill: var(--warn); }
+#map .rbadge text { font-size: 11px; font-weight: 650; fill: var(--surface); }
+.jn.moving { animation: rb-blink .45s ease-in-out infinite alternate; }
+@keyframes rb-blink { to { r: 5; opacity: .35; } }
+.gx.paused .station-c { opacity: .45; }
 /* highlight one group: dim the others */
 #map[data-gf="0"] .gx:not(.g0), #map[data-gf="0"] .dot.read:not(.g0), #map[data-gf="0"] .cur:not(.g0),
 #map[data-gf="1"] .gx:not(.g1), #map[data-gf="1"] .dot.read:not(.g1), #map[data-gf="1"] .cur:not(.g1),
@@ -546,6 +552,7 @@ textarea.field { max-width: none; min-height: 150px; font-family: var(--mono); f
 @media (prefers-reduced-motion: reduce) {
   #map .zone, .cell, .station-c, .switch input, .switch input::after, .rail, .steps button, .steps .n, .tile, .field, .btn, .link-btn { transition: none; }
   .track.blocked { animation: none; }
+  .jn.moving { animation: none; }
 }
 </style>
 
@@ -679,7 +686,7 @@ const PRESETS = {
 const PKEYS = Object.keys(PRESETS.balanced).filter(k => k !== 'label' && k !== 'hint');
 const STORE = 'kafka-pilot-v2';
 
-let S = { more: [], goal: 'starter', topic: 'orders', host: 'kafka', group: 'orders-service', lang: 'java', keys: ['customer-42', 'customer-7'], hotKey: false };
+let S = { more: [], assign: 'range', goal: 'starter', topic: 'orders', host: 'kafka', group: 'orders-service', lang: 'java', keys: ['customer-42', 'customer-7'], hotKey: false };
 let importText = '', importReport = null, rk = 0;
 PKEYS.forEach(k => { S[k] = PRESETS.starter[k]; });
 try { const saved = JSON.parse(localStorage.getItem(STORE) || 'null'); if (saved) S = Object.assign(S, saved); } catch (e) {}
@@ -764,6 +771,7 @@ let introTl = null, introDone = !motionOK(), prevSig = '';
 function normalize() {
   S.producers = clamp(S.producers || 1, 1, 5);
   if (!SPEED[S.speed]) S.speed = 'normal';
+  if (!ASSIGN[S.assign]) S.assign = 'range';
   S.more = (Array.isArray(S.more) ? S.more : []).slice(0, 2).map(g => ({ name: String(g.name || '').slice(0, 60),
     consumers: clamp(Number(g.consumers) || 1, 1, 8), speed: SPEED[g.speed] ? g.speed : 'normal' }));
   S.brokers = clamp(S.brokers, 1, 5);
@@ -791,6 +799,32 @@ function normalize() {
 const SPEED = { fast: { ms: 10, gap: 150, label: 'About 10 ms', hint: 'Simple updates, in-memory work' },
   normal: { ms: 100, gap: 340, label: 'About 100 ms', hint: 'A database write or an API call' },
   slow: { ms: 1000, gap: 1300, label: 'About 1 second', hint: 'Image resizing, reports, slow services' } };
+// How a group shares partitions between its consumers (partition.assignment.strategy)
+const ASSIGN = {
+  range: { java: 'RangeAssignor', rd: 'range', label: 'Range', hint: 'Kafka’s default. Each consumer gets a block of neighbouring partitions. The whole group stops reading while partitions move.' },
+  roundrobin: { java: 'RoundRobinAssignor', rd: 'roundrobin', label: 'Round robin', hint: 'Partitions are dealt out one by one, like cards. The whole group stops reading while partitions move.' },
+  sticky: { java: 'CooperativeStickyAssignor', rd: 'cooperative-sticky', label: 'Cooperative sticky', hint: 'Partitions stay where they are when possible, and only the ones that move pause. Recommended for new apps.' } };
+// Which consumer owns each partition. prev is the last assignment, used by the sticky strategy.
+function assignOwners(P, C, strategy, prev) {
+  if (strategy === 'roundrobin') return Array.from({ length: P }, (_, p) => p % C);
+  if (strategy === 'range' || !prev) {
+    // contiguous blocks; the first P % C consumers get one extra partition
+    const n = Math.floor(P / C), extra = P % C, own = [];
+    for (let j = 0, p = 0; j < C; j++) for (let k = 0; k < n + (j < extra ? 1 : 0); k++) own[p++] = j;
+    return own;
+  }
+  // cooperative-sticky: keep each partition with its consumer, then move as few as needed to balance
+  const own = Array.from({ length: P }, (_, p) => prev[p] !== undefined && prev[p] < C ? prev[p] : -1), load = Array(C).fill(0);
+  const max = Math.ceil(P / C);
+  own.forEach((j, p) => { if (j < 0) return; if (load[j] < max) load[j]++; else own[p] = -1; });
+  own.forEach((j, p) => { if (j < 0) { const k = load.indexOf(Math.min(...load)); own[p] = k; load[k]++; } });
+  for (;;) {
+    const hi = load.indexOf(Math.max(...load)), lo = load.indexOf(Math.min(...load));
+    if (load[hi] - load[lo] <= 1) break;
+    const p = own.lastIndexOf(hi); own[p] = lo; load[hi]--; load[lo]++;
+  }
+  return own;
+}
 // The main group comes from the consumer questions; up to two more groups read the same topic independently
 const groupList = () => [{ name: group(), consumers: S.consumers, speed: S.speed },
   ...S.more.map(g => ({ name: g.name.trim() || 'other-service', consumers: g.consumers, speed: g.speed }))];
@@ -963,7 +997,11 @@ function consumerFile() {
     '# Send a heartbeat every third of the session timeout',
     `heartbeat.interval.ms=${Math.floor(S.sessionTimeout * 1000 / 3)}`,
     `# Must call poll() again within ${S.pollInterval} min, or Kafka treats this consumer as stuck`,
-    `max.poll.interval.ms=${S.pollInterval * 60000}`);
+    `max.poll.interval.ms=${S.pollInterval * 60000}`,
+    { range: '# Share partitions in blocks of neighbours (Kafka\'s default); the group pauses while they move',
+      roundrobin: '# Deal partitions out one by one; the group pauses while they move',
+      sticky: '# Keep partitions where they are and pause only the ones that move' }[S.assign],
+    `partition.assignment.strategy=org.apache.kafka.clients.consumer.${ASSIGN[S.assign].java}`);
   if (S.onFail === 'dlq') L.push(`# Messages your code cannot handle go to the "${topic()}.dlq" topic (see ConsumerLoop.java)`);
   if (S.more.length) L.push('', `# Other groups reading "${topic()}": ${list(S.more.map(g => `${g.name.trim() || 'other-service'} (${pl(g.consumers, 'consumer')})`))}.`,
     '# Each uses this same file with its own group.id and gets every message.');
@@ -1079,7 +1117,7 @@ function rdConsumer(storeOffsets) {
   e.push(['fetch.min.bytes', S.fetchMin], ['fetch.wait.max.ms', 500, 'Java name: fetch.max.wait.ms'],
     ['max.partition.fetch.bytes', msgBytes()], ['fetch.max.bytes', Math.max(52428800, msgBytes())],
     ['session.timeout.ms', S.sessionTimeout * 1000], ['heartbeat.interval.ms', Math.floor(S.sessionTimeout * 1000 / 3)],
-    ['max.poll.interval.ms', S.pollInterval * 60000]);
+    ['max.poll.interval.ms', S.pollInterval * 60000], ['partition.assignment.strategy', ASSIGN[S.assign].rd]);
   return e;
 }
 const dictLines = (entries, q, ind, cmt, bools) => entries.map(([k, v, note]) =>
@@ -1164,7 +1202,8 @@ function springFile() {
     '      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer',
     '      properties:', `        max.partition.fetch.bytes: ${msgBytes()}`, `        fetch.max.bytes: ${Math.max(52428800, msgBytes())}`,
     `        session.timeout.ms: ${S.sessionTimeout * 1000}`, `        heartbeat.interval.ms: ${Math.floor(S.sessionTimeout * 1000 / 3)}`,
-    `        max.poll.interval.ms: ${S.pollInterval * 60000}`);
+    `        max.poll.interval.ms: ${S.pollInterval * 60000}`,
+    `        partition.assignment.strategy: org.apache.kafka.clients.consumer.${ASSIGN[S.assign].java}`);
   if (!S.autoCommit) L.push('    listener:', '      # Commit after your @KafkaListener has handled each poll\'s messages', '      ack-mode: batch');
   L.push('', '# Failed messages: add this bean to a @Configuration class.',
     '# @Bean', '# DefaultErrorHandler errorHandler(KafkaTemplate<Object, Object> template) {');
@@ -1283,6 +1322,7 @@ const IMPORT = {
   'fetch.min.bytes': ['fetchMin', v => size(v) <= 1 ? 1 : 65536],
   'session.timeout.ms': ['sessionTimeout', v => num(v) / 1000],
   'max.poll.interval.ms': ['pollInterval', v => num(v) / 60000],
+  'partition.assignment.strategy': ['assign', v => /cooperative/i.test(v) ? 'sticky' : /roundrobin/i.test(v) ? 'roundrobin' : 'range'],
   'num.partitions': ['partitions', num],
   'default.replication.factor': ['rf', num],
   'min.insync.replicas': ['minIsr', num],
@@ -1515,6 +1555,8 @@ function controlsHtml() {
       ${stepper('consumers', 'Consumers in the group', '', 1, 8, `You have ${pl(S.partitions, 'partition')}, so up to ${S.partitions} can work at once.`)}</div>` +
     choice('speed', 'How long does your code take to handle one message?', '', Object.entries(SPEED).map(([v, sp]) => ({ v, label: sp.label, hint: sp.hint })),
       `One consumer handles about ${Math.round(1000 / SPEED[S.speed].ms)} messages a second. If producers send more than the whole group can handle, lag grows.`) +
+    choice('assign', 'How should a group share partitions between its consumers?', 'partition.assignment.strategy', Object.entries(ASSIGN).map(([v, a]) => ({ v, label: a.label, hint: a.hint })),
+      'When a consumer joins, leaves or crashes, Kafka moves partitions between the rest: a rebalance. Watch the group box in the diagram when you add or remove a consumer.') +
     choice('reset', 'Where should a new group start reading?', 'auto.offset.reset', [
       { v: 'earliest', label: 'From the beginning', hint: 'Read everything still stored' },
       { v: 'latest', label: 'From now on', hint: 'Only messages sent after it starts' }]) +
@@ -1563,7 +1605,7 @@ function explainHtml() {
   const batchText = S.linger ? `Messages wait up to ${S.linger} ms so several travel together, up to ${S.batch} KB per partition. Fewer, bigger requests mean more throughput for a small delay.` : 'Each message is sent the moment you produce it. Lowest delay, but many small requests.';
   const comp = { none: 'Batches are sent uncompressed.', lz4: 'Batches are compressed with lz4: fast, with good savings on text and JSON.', zstd: 'Batches are compressed with zstd: the smallest on the wire, for a little more CPU.', snappy: 'Batches are compressed with snappy: fast, a little larger than lz4.', gzip: 'Batches are compressed with gzip: small but slow. zstd is usually a better choice.' }[S.compression];
   const assign = Array.from({ length: C }, (_, j) => {
-    const mine = []; for (let p = j; p < P; p += C) mine.push('P' + p);
+    const mine = []; for (let p = 0; p < P; p++) if (G.own[0][p] === j) mine.push('P' + p);
     return `<li class="c">Consumer ${j + 1}: ${mine.length ? list(mine) : 'idle, nothing to read'}</li>`;
   }).join('');
   let facts = '', file = '', visual = '';
@@ -1615,12 +1657,12 @@ function showHash() {
 function keyVisual() {
   if (!S.keys.length) return '';
   const P = S.partitions, C = S.consumers;
-  const rows = S.keys.map(k => { const p = partitionFor(k); return `<li><code>${esc(k)}</code> goes to P${p}, read by Consumer ${p % C + 1}</li>`; }).join('');
+  const rows = S.keys.map(k => { const p = partitionFor(k); return `<li><code>${esc(k)}</code> goes to P${p}, read by Consumer ${G.own[0][p] + 1}</li>`; }).join('');
   let hot = '';
   if (S.hotKey) {
     // 80% of traffic carries the first key; the rest spreads evenly
     const hp = partitionFor(S.keys[0]), share = Array.from({ length: P }, (_, p) => .2 / P + (p === hp ? .8 : 0));
-    const load = Array.from({ length: C }, (_, j) => share.reduce((a, v, p) => a + (p % C === j ? v : 0), 0));
+    const load = Array.from({ length: C }, (_, j) => share.reduce((a, v, p) => a + (G.own[0][p] === j ? v : 0), 0));
     const busy = load.indexOf(Math.max(...load)), W = 400, bw = (W - 16) / P, x = p => 8 + bw * p;
     let s = `<svg class="tl" viewBox="0 0 ${W} 104" aria-hidden="true">`;
     share.forEach((v, p) => {
@@ -1694,7 +1736,8 @@ function geom() {
   const gy0 = []; blockH.reduce((y, h) => { gy0.push(y); return y + h; }, top + (bodyH - consH) / 2);
   SLOTS = multi ? 11 : 12;
   const tx = 262, sw = 25, tEnd = tx + SLOTS * sw, rx = tEnd + (multi ? 84 : 58);
-  return { P, C, B, N, gs, gy0, blockH, multi, top, rowH, bodyH, H: top + bodyH + 40, tx, sw, tEnd, rx, xR: 800, px: 52, qx: 140, cx: 878, py: top + bodyH / 2,
+  const own = gs.map((gr, g) => assignOwners(P, gr.consumers, S.assign, G && G.own && G.own[g]));
+  return { P, C, B, N, gs, own, gy0, blockH, multi, top, rowH, bodyH, H: top + bodyH + 40, tx, sw, tEnd, rx, xR: 800, px: 52, qx: 140, cx: 878, py: top + bodyH / 2,
     busX: g => 816 + g * 13,
     rowY: i => top + (bodyH - P * rowH) / 2 + rowH * (i + .5),
     cY: (g, j) => gy0[g] + 50 + 40 * (j + .5),
@@ -1724,7 +1767,7 @@ function outPath(p, i = 0) {
 // slot being read > along the partition > the consumer that owns it
 // slot being read > along the partition > down its group's own lane > the consumer that owns it
 function readPath(p, off, g) {
-  const y = G.rowY(p), cy = G.cY(g, p % G.gs[g].consumers), bx = G.busX(g);
+  const y = G.rowY(p), cy = G.cY(g, G.own[g][p]), bx = G.busX(g);
   return [[G.slotX(p, off), y], [bx, y], [bx, cy], [G.cx - 14, cy]];
 }
 // a slot fades once every group has read it
@@ -1817,8 +1860,21 @@ function playIntro() {
     .from(q('[data-fid^="cs-"], .cur'), { scale: 0, opacity: 0, transformOrigin: '50% 50%', duration: .35, ease: M.pop, stagger: .04 }, '-=.2');
 }
 // small buttons drawn inside the diagram (group settings)
+const rbOn = g => rebal[g] && rebal[g].until > performance.now();
 const gbtn = (act, x, y, w, label, tipk, aria, off) => `<g class="gctl${off ? ' off' : ''}" data-gctl="${act}" data-tip="${tipk}" role="button" tabindex="${off ? -1 : 0}" aria-disabled="${!!off}" aria-label="${aria}"><rect x="${x}" y="${y}" width="${w}" height="20" rx="5"/><text x="${x + w / 2}" y="${y + 14}" text-anchor="middle">${label}</text></g>`;
-let gFocus = null;
+let gFocus = null, rebal = [];
+// When a group's consumers or strategy change, its partitions move: that is a rebalance
+function detectRebalance(oldOwn, oldGroups) {
+  if (!oldOwn) return;
+  const now = performance.now();
+  G.gs.forEach((gr, g) => {
+    const before = oldOwn[g]; if (!before || !oldGroups[g] || oldGroups[g] !== gr.name) return;
+    const moved = new Set(G.own[g].map((j, p) => (before[p] !== undefined && before[p] !== j ? p : -1)).filter(p => p >= 0));
+    if (!moved.size) return;
+    rebal[g] = { until: now + 1800, moved, eager: S.assign !== 'sticky' };
+    announce(`Rebalancing ${gr.name}: ${pl(moved.size, 'partition')} ${moved.size > 1 ? 'move' : 'moves'} to another consumer.`);
+  });
+}
 function groupCtl(act) {
   const [k, gs, d] = act.split(':'), g = Number(gs), gr = g > 0 ? S.more[g - 1] : null, next = { fast: 'normal', normal: 'slow', slow: 'fast' };
   if (k === 'cons') { const v = clamp((gr ? gr.consumers : S.consumers) + Number(d), 1, 8); if (gr) gr.consumers = v; else S.consumers = v; }
@@ -1826,6 +1882,11 @@ function groupCtl(act) {
   normalize(); save(); lagHist.length = 0; renderAll();
   const again = map.querySelector(`[data-gctl="${act}"]`);
   (again && again.getAttribute('aria-disabled') !== 'true' ? again : map.querySelector(`.gname[data-g="${g}"]`)).focus();
+}
+function endRebalance(g) {
+  const b = $(`rb-${g}`); if (b) b.remove();
+  map.querySelectorAll(`.gx.g${g} .jn.moving`).forEach(el => el.classList.remove('moving'));
+  map.querySelectorAll(`.gx.g${g}.paused`).forEach(el => el.classList.remove('paused'));
 }
 function focusGroup(g) {
   gFocus = gFocus === g ? null : g;
@@ -1837,7 +1898,9 @@ function drawMap() {
   if (introTl) { introTl.progress(1); introTl = null; introDone = true; }
   syncLogs();
   const prev = motionOK() ? snapshot() : new Map(), oldLeaders = G ? G.parts.map(s => s.leader) : null;
+  const oldOwn = G && G.own, oldGroups = G ? G.gs.map(g => g.name) : [];
   G = geom();
+  detectRebalance(oldOwn, oldGroups);
   const { P, C, B, top, H, tx, sw, tEnd, rx, xR } = G;
   let s = `<defs><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect class="hatch-bg" width="8" height="8"/><line class="hatch-ln" x1="0" y1="0" x2="0" y2="8"/></pattern></defs>`;
   // Three labelled sections: your apps write, the Kafka cluster stores, your services read
@@ -1910,7 +1973,7 @@ function drawMap() {
     const bx = G.busX(g), y0 = G.gy0[g], bh = G.blockH[g] - 12, bxl = G.cx - 24;
     const ys = G.parts.map(st => G.rowY(st.p)), cys = Array.from({ length: gr.consumers }, (_, j) => G.cY(g, j));
     s += `<g class="gx g${g}" aria-hidden="true"><line class="route-c bus g${g}" x1="${bx}" y1="${Math.min(...ys, ...cys)}" x2="${bx}" y2="${Math.max(...ys, ...cys)}"/>
-      ${ys.map(y => `<circle class="jn" cx="${bx}" cy="${y}" r="2.8"/>`).join('')}${cys.map(cy => `<line class="route-c g${g}" x1="${bx}" y1="${cy}" x2="${G.cx - 14}" y2="${cy}"/>`).join('')}</g>`;
+      ${ys.map((y, p) => `<circle class="jn${rbOn(g) && (rebal[g].eager || rebal[g].moved.has(p)) ? ' moving' : ''}" cx="${bx}" cy="${y}" r="2.8"/>`).join('')}${cys.map(cy => `<line class="route-c g${g}" x1="${bx}" y1="${cy}" x2="${G.cx - 14}" y2="${cy}"/>`).join('')}</g>`;
     const name = gr.name.length > 14 ? gr.name.slice(0, 13) + '…' : gr.name, cons = gr.consumers, sp = { fast: '10 ms', normal: '100 ms', slow: '1 s' }[gr.speed];
     s += `<g class="gbox gx g${g}" data-fid="gb-${g}"><rect class="gframe" x="${bxl}" y="${y0}" width="${996 - 6 - bxl}" height="${bh}" rx="8"/>
       <g class="gname" data-g="${g}" data-tip="group:${g}" role="button" tabindex="0" aria-pressed="${gFocus === g}" aria-label="Group ${esc(gr.name)}. ${gFocus === g ? 'Show all groups' : 'Highlight only its lines'}">
@@ -1918,11 +1981,12 @@ function drawMap() {
       ${gbtn(`cons:${g}:-1`, bxl + 8, y0 + 26, 20, '−', `gctl:cons:${g}`, `Fewer consumers in ${esc(gr.name)}`, cons <= 1)}
       <text class="gcount" x="${bxl + 41}" y="${y0 + 40}" text-anchor="middle" aria-hidden="true">${cons}</text>
       ${gbtn(`cons:${g}:1`, bxl + 54, y0 + 26, 20, '+', `gctl:cons:${g}`, `More consumers in ${esc(gr.name)}`, cons >= 8)}
-      ${gbtn(`speed:${g}`, bxl + 82, y0 + 26, 48, sp, `gctl:speed:${g}`, `Time per message in ${esc(gr.name)}: ${sp}. Change it`, false)}</g>`;
+      ${gbtn(`speed:${g}`, bxl + 82, y0 + 26, 48, sp, `gctl:speed:${g}`, `Time per message in ${esc(gr.name)}: ${sp}. Change it`, false)}
+      ${rbOn(g) ? `<g class="rbadge" id="rb-${g}" data-tip="rebal:${g}" aria-hidden="true"><rect x="${996 - 6 - 92}" y="${y0 - 15}" width="86" height="18" rx="9"/><text x="${996 - 6 - 49}" y="${y0 - 2}" text-anchor="middle">rebalancing</text></g>` : ''}</g>`;
     s += `<g aria-hidden="true">`;
     for (let j = 0; j < cons; j++) {
-      const idle = j >= P, y = G.cY(g, j);
-      s += `<g class="gx g${g}" data-fid="cs-${g}-${j}" data-tip="cons:${g}:${j}"><circle class="station-c g${g}${idle ? ' idle' : ''}" id="cons-${g}-${j}" cx="${G.cx}" cy="${y}" r="13"/>${icoAt('inbox', G.cx - 8, y - 8, 16, `cic g${g}${idle ? ' idle' : ''}`)}
+      const idle = j >= P, y = G.cY(g, j), paused = rbOn(g) && rebal[g].eager;
+      s += `<g class="gx g${g}${paused ? ' paused' : ''}" data-fid="cs-${g}-${j}" data-tip="cons:${g}:${j}"><circle class="station-c g${g}${idle ? ' idle' : ''}" id="cons-${g}-${j}" cx="${G.cx}" cy="${y}" r="13"/>${icoAt('inbox', G.cx - 8, y - 8, 16, `cic g${g}${idle ? ' idle' : ''}`)}
         <text x="${G.cx + 20}" y="${y + 4}">Consumer ${j + 1}</text>${idle ? `<text class="muted" x="${G.cx + 20}" y="${y + 18}">idle</text>` : ''}</g>`;
     }
     s += '</g>';
@@ -2067,7 +2131,9 @@ function spawn(now) {
 function readStep(now) {
   G.gs.forEach((gr, g) => {
     for (let n = 0; n < G.P; n++) {
-      const p = (rp0 + n) % G.P, L = logs[p], key = g + ':' + (p % gr.consumers);
+      const p = (rp0 + n) % G.P, L = logs[p], key = g + ':' + G.own[g][p], rb = rebal[g];
+      // during a rebalance an eager group stops reading altogether; a cooperative one only pauses moved partitions
+      if (rb && rb.until > now && (rb.eager || rb.moved.has(p))) continue;
       if (L.pos[g] >= L.hw || G.parts[p].leader === null || (busy[key] || 0) > now) continue;
       busy[key] = now + SPEED[gr.speed].gap;
       msgs.push({ kind: 'read', p, g, off: L.pos[g]++, t0: now });
@@ -2083,6 +2149,7 @@ function frame(now) {
   if (now - lastSpawn > (700 + S.linger * 7) / G.N && msgs.length < 320) { lastSpawn = now; spawn(now); }
   readStep(now);
   if (now - lastLagT > 1000) { lastLagT = now; sampleLag(); }
+  rebal.forEach((rb, g) => { if (rb && rb.until <= now && !rb.cleared) { rb.cleared = true; endRebalance(g); } });
   const layer = $('dots'); if (!layer) return;
   for (const m of msgs) {
     if (m.p >= G.P) { m.dead = true; continue; }
@@ -2115,7 +2182,7 @@ function frame(now) {
       if (st.leader === null || m.g >= G.gs.length) { m.dead = true; if (m.g < L.pos.length) L.pos[m.g] = Math.min(L.pos[m.g], m.off); continue; }
       if (t >= 900) {
         m.dead = true; L.cons[m.g] = Math.max(L.cons[m.g], m.off + 1); updateTape(m.p);
-        pulse($(`cons-${m.g}-${m.p % G.gs[m.g].consumers}`), 'hit', 220); continue;
+        pulse($(`cons-${m.g}-${G.own[m.g][m.p]}`), 'hit', 220); continue;
       }
       pos = along(readPath(m.p, m.off, m.g), ease(t / 900));
     } else if (m.kind === 'err') {
@@ -2198,7 +2265,7 @@ function tipText(key) {
     }
     case 'cons': {
       const gr = gs[n], j = Number(b); if (!gr) return null;
-      const mine = Array.from({ length: S.partitions }, (_, p) => p).filter(p => p % gr.consumers === j);
+      const mine = Array.from({ length: S.partitions }, (_, p) => p).filter(p => G.own[n][p] === j);
       return [`Consumer ${j + 1} · ${esc(gr.name)}`, j >= S.partitions ? 'Idle: the group has more consumers than partitions, so nothing is left for this one.'
         : `Reads ${list(mine.map(p => 'P' + p))}. Handles about ${Math.round(1000 / SPEED[gr.speed].ms)} messages a second (${SPEED[gr.speed].label.toLowerCase()} each), then commits its position.`];
     }
@@ -2211,6 +2278,8 @@ function tipText(key) {
       return a === 'cons' ? [`Consumers in ${esc(gr.name)}: ${gr.consumers}`, `Use − and + to change. Up to ${S.partitions} can work at once, one per partition; more sit idle.`]
         : [`Time per message in ${esc(gr.name)}`, `Now ${SPEED[gr.speed].label.toLowerCase()}, so one consumer handles about ${Math.round(1000 / SPEED[gr.speed].ms)} messages a second. Click to switch between 10 ms, 100 ms and 1 s.`];
     }
+    case 'rebal': return ['Rebalancing', S.assign === 'sticky' ? 'Kafka is moving some partitions to other consumers. With cooperative sticky, only the partitions that move pause; the rest keep being read.'
+      : `Kafka is moving partitions between this group’s consumers. With ${ASSIGN[S.assign].label.toLowerCase()} assignment, every consumer in the group stops reading until it is done.`];
     case 'groups': return ['Consumer groups', 'Each group reads every message on its own and keeps its own position, so a slow group never holds back a fast one. Inside a group, each partition is read by exactly one consumer.'];
     case 'leg': return {
       prod: ['Producer', 'Your app writing messages to the topic.'], 'role-broker': ['Broker', 'A Kafka server that stores copies of partitions.'],
@@ -2359,7 +2428,7 @@ function moveRail(animate) {
 }
 function renderAll() {
   work.dataset.role = STEPS[step].role;
-  renderNav(); renderControls(); renderSide(); drawMap();
+  renderNav(); renderControls(); drawMap(); renderSide();
   $('back').disabled = step === 0;
   $('next').innerHTML = step < STEPS.length - 1 ? `Next: ${STEPS[step + 1].name}${ic('arrow-right')}` : ic('refresh') + 'Start over';
 }
@@ -2383,8 +2452,8 @@ function set(k, v, light) {
   S[k] = v;
   if (k === 'goal') PKEYS.forEach(p => { S[p] = PRESETS[v][p]; });
   normalize(); save();
-  if (light) { renderNav(); renderSide(); drawMap(); }
-  else { renderNav(); renderControls(); renderSide(); drawMap(); }
+  if (light) { renderNav(); drawMap(); renderSide(); }
+  else { renderNav(); renderControls(); drawMap(); renderSide(); }
 }
 
 function addKey() {
@@ -2535,6 +2604,6 @@ if (document.fonts) document.fonts.ready.then(() => moveRail(false));
 playIntro();
 requestAnimationFrame(frame);
 // Test hook: only the automated tests (tests/run.js) set __KP_TEST__ to read state and tooltip text
-if (window.__KP_TEST__) window.__kp = { S: () => S, tipText, checks, partitionFor, groupLag, lagTrend, parts };
+if (window.__KP_TEST__) window.__kp = { S: () => S, tipText, checks, partitionFor, groupLag, lagTrend, parts, assignOwners, G: () => G };
 })();
 </script>
