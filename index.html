@@ -2604,6 +2604,6 @@ if (document.fonts) document.fonts.ready.then(() => moveRail(false));
 playIntro();
 requestAnimationFrame(frame);
 // Test hook: only the automated tests (tests/run.js) set __KP_TEST__ to read state and tooltip text
-if (window.__KP_TEST__) window.__kp = { S: () => S, tipText, checks, partitionFor, groupLag, lagTrend, parts, assignOwners, G: () => G };
+if (window.__KP_TEST__) window.__kp = { S: () => S, tipText, checks, partitionFor, groupLag, lagTrend, parts, assignOwners, G: () => G, files: () => Object.fromEntries(Object.entries(FILES).map(([n, f]) => [n, f.make()])) };
 })();
 </script>
