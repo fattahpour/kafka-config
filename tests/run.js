@@ -166,6 +166,34 @@ test('partition assignment follows Kafka assignors, and sticky moves the fewest'
   noErrors(page); await page.context().close();
 });
 
+test('a shared link or code restores the same setup', async () => {
+  const page = await open();
+  await page.click('#pb-producers-inc'); await page.click('#pb-partitions-inc'); await page.click('#pb-groups-inc');
+  await page.click('.steps button[data-goto="3"]'); await page.click('input[name="assign"][value="sticky"]', { force: true });
+  await page.click('#share');
+  const code = await page.inputValue('#share-code'), link = await page.inputValue('#share-link');
+  assert(/^KP1\.[A-Za-z0-9_-]+$/.test(code) && link.includes('#s=' + code), 'share code or link malformed');
+  const want = await page.evaluate(() => { const s = window.__kp.S(); return JSON.stringify([s.producers, s.partitions, s.assign, s.more.length]); });
+  await page.context().close();
+  // fresh browser opening the link
+  const ctx = await browser.newContext(); await ctx.addInitScript(() => { window.__KP_TEST__ = true; });
+  const p2 = await ctx.newPage(); p2.errors = []; p2.on('pageerror', e => p2.errors.push(e.message));
+  await p2.goto('file://' + PAGE + '#s=' + code); await p2.waitForTimeout(400);
+  const got = await p2.evaluate(() => { const s = window.__kp.S(); return JSON.stringify([s.producers, s.partitions, s.assign, s.more.length]); });
+  assert(got === want, `link restored ${got}, expected ${want}`);
+  assert(!(await p2.evaluate(() => location.hash)).includes('s='), 'the code should be removed from the address after loading');
+  noErrors(p2); await ctx.close();
+  // fresh browser pasting the code into Import
+  const p3 = await open();
+  await p3.fill('#importText', 'here is my setup: ' + code); await p3.click('[data-act="import"]'); await p3.waitForTimeout(150);
+  const got3 = await p3.evaluate(() => { const s = window.__kp.S(); return JSON.stringify([s.producers, s.partitions, s.assign, s.more.length]); });
+  assert(got3 === want, `import restored ${got3}, expected ${want}`);
+  assert((await p3.textContent('#import-report')).includes('shared setup'), 'import report does not mention the shared setup');
+  // a broken code is ignored, not crashing
+  await p3.fill('#importText', 'KP1.!!!not-a-code'); await p3.click('[data-act="import"]');
+  noErrors(p3); await p3.context().close();
+});
+
 test('theme switch cycles and is remembered', async () => {
   const page = await open();
   const theme = () => page.evaluate(() => document.documentElement.getAttribute('data-theme') || 'auto');

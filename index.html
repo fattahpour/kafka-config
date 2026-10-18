@@ -320,6 +320,12 @@ h1 { font-size: 15px; font-weight: 590; letter-spacing: -0.01em; line-height: 1;
 .htry { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-weight: 590; font-size: 14px; }
 .htry .field { max-width: 220px; }
 .tip em { font-style: normal; font-weight: 650; }
+.crumb .sharebtn { margin-left: auto; min-height: 32px; padding: 3px 10px; font-size: 12.5px; }
+.sharebox { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow); max-width: 860px; }
+.sharebox p { margin: 0; font-size: 14px; color: var(--ink-2); }
+.sharerow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.sharerow label { width: 40px; font-weight: 590; font-size: 13.5px; }
+.sharerow .field { flex: 1 1 260px; max-width: none; font-family: var(--mono); font-size: 12px; }
 .tip { position: fixed; z-index: 60; max-width: 300px; padding: 9px 12px; border-radius: 8px; background: var(--ink); color: var(--paper); font-size: 13px; line-height: 1.45; box-shadow: 0 10px 30px rgba(8, 9, 10, .28); pointer-events: none; }
 .tip b { display: block; margin-bottom: 2px; font-weight: 650; }
 #map [data-tip], .legend [data-tip], .pcount[data-tip], .lag-groups [data-tip] { cursor: help; }
@@ -580,9 +586,14 @@ textarea.field { max-width: none; min-height: 150px; font-family: var(--mono); f
 
   <main class="main" id="main">
     <header class="top">
-      <p class="crumb"><span>Kafka Pilot</span><span class="sep" aria-hidden="true">/</span><span id="crumb-step"></span><span class="pill" id="crumb-pill"><i aria-hidden="true"></i><span></span></span></p>
+      <p class="crumb"><span>Kafka Pilot</span><span class="sep" aria-hidden="true">/</span><span id="crumb-step"></span><span class="pill" id="crumb-pill"><i aria-hidden="true"></i><span></span></span><button type="button" class="link-btn sharebtn" id="share" data-tip="share" aria-expanded="false" aria-controls="sharebox"></button></p>
       <p class="lede">Configure Kafka in five plain questions. <span>See it, then copy it.</span></p>
       <p class="sub-lede">Answer a few questions about your topic. Watch the diagram change, then copy working producer, broker and consumer configs.</p>
+      <div class="sharebox" id="sharebox" hidden>
+        <p><b>Share this setup.</b> The link opens Kafka Pilot with these answers. If it opens without them, because some sites drop the part after #, paste the code into <em>Import</em> on the Goal step.</p>
+        <div class="sharerow"><label for="share-link">Link</label><input class="field" id="share-link" readonly data-tip="share-link"><button type="button" class="btn" data-copyshare="link" data-tip="share-copy-link"></button></div>
+        <div class="sharerow"><label for="share-code">Code</label><input class="field" id="share-code" readonly data-tip="share-code"><button type="button" class="btn" data-copyshare="code" data-tip="share-copy-code"></button></div>
+      </div>
     </header>
 
     <section class="stage" aria-label="Live diagram of your Kafka setup">
@@ -691,7 +702,27 @@ let importText = '', importReport = null, rk = 0;
 PKEYS.forEach(k => { S[k] = PRESETS.starter[k]; });
 try { const saved = JSON.parse(localStorage.getItem(STORE) || 'null'); if (saved) S = Object.assign(S, saved); } catch (e) {}
 const down = new Set();
-let step = Math.max(0, STEPS.findIndex(s => '#' + s.id === location.hash));
+/* ---------- Share ---------- */
+// A setup travels as a short code, KP1.<base64url JSON>: in a link after #s=, or pasted into Import
+const SHARE_KEYS = [...PKEYS, 'goal', 'topic', 'host', 'group', 'lang', 'keys', 'hotKey', 'more', 'assign'];
+const b64u = {
+  enc: t => btoa(unescape(encodeURIComponent(t))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
+  dec: t => decodeURIComponent(escape(atob(t.replace(/-/g, '+').replace(/_/g, '/')))) };
+const shareCode = () => 'KP1.' + b64u.enc(JSON.stringify(Object.fromEntries(SHARE_KEYS.map(k => [k, S[k]]))));
+const shareLink = () => location.href.split('#')[0] + '#s=' + shareCode();
+function readShareCode(txt) {
+  const m = /KP1\.([A-Za-z0-9_-]+)/.exec(txt || ''); if (!m) return null;
+  try {
+    const o = JSON.parse(b64u.dec(m[1])), out = {};
+    // keep only known settings with the expected type; normalize() then clamps every value
+    for (const k of SHARE_KEYS) if (o && k in o && (Array.isArray(S[k]) ? Array.isArray(o[k]) : typeof o[k] === typeof S[k])) out[k] = o[k];
+    if (out.keys) out.keys = out.keys.filter(x => typeof x === 'string').map(x => x.slice(0, 40)).slice(0, 6);
+    return Object.keys(out).length ? out : null;
+  } catch (e) { return null; }
+}
+const fromLink = readShareCode(location.hash);
+if (fromLink) Object.assign(S, fromLink);
+let step = fromLink ? 0 : Math.max(0, STEPS.findIndex(s => '#' + s.id === location.hash));
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1414,7 +1445,7 @@ function importReportHtml() {
   if (!importReport) return '';
   const R = importReport;
   return `<div class="report" id="import-report" tabindex="-1">
-    <h4>${R.applied.length ? `Loaded ${pl(R.applied.length, 'setting')}. The diagram and every step now use them.` : 'No settings Kafka Pilot knows were found.'}</h4>
+    <h4>${R.shared ? 'Loaded a shared setup. The diagram and every step now use it.' : R.applied.length ? `Loaded ${pl(R.applied.length, 'setting')}. The diagram and every step now use them.` : 'No settings Kafka Pilot knows were found.'}</h4>
     ${R.problems.length ? `<div class="notes">${R.problems.map(t => `<div class="note warn">${ICON.warn}<div><span class="sr">Problem: </span>${t}</div></div>`).join('')}</div>` : (R.applied.length ? `<div class="note ok">${ICON.ok}<div>No combinations that Kafka rejects.</div></div>` : '')}
     ${R.rounded.length ? `<div><b>Adjusted to fit</b><ul>${R.rounded.map(x => `<li>${x}</li>`).join('')}</ul></div>` : ''}
     ${R.unknown.length ? `<div><b>Not covered by Kafka Pilot yet</b><p class="help">${R.unknown.map(k => `<code class="key">${esc(k)}</code>`).join(' ')}</p></div>` : ''}
@@ -1487,7 +1518,7 @@ function controlsHtml() {
     `<div class="sub"><h3>Already have a config?</h3>
       <div class="q"><label class="qlabel" for="importText">Paste it to load and check it</label>
       <p class="help">Works with .properties files, Spring Boot application.yml and Docker KAFKA_ variables. Kafka Pilot fills in every step and points out combinations Kafka rejects.</p>
-      <textarea class="field" id="importText" spellcheck="false" autocomplete="off" placeholder="acks=all&#10;linger.ms=10&#10;group.id=orders-service">${esc(importText)}</textarea>
+      <textarea class="field" id="importText" data-tip="import-text" spellcheck="false" autocomplete="off" placeholder="acks=all&#10;linger.ms=10&#10;group.id=orders-service">${esc(importText)}</textarea>
       <div class="actions"><button type="button" class="btn primary" data-act="import">${ic('file-import')}Load and check</button>
       <button type="button" class="btn" data-act="example">${ic('bug')}Try a broken example</button></div>
       ${savedText !== null ? `<p class="field-msg">The example replaced your text. <button type="button" class="link-btn" data-act="restore">Put my text back</button></p>` : ''}</div>
@@ -2367,6 +2398,7 @@ function renderBar() {
 $('pgoal').addEventListener('change', e => { if (e.target.id === 'pb-goal') { set('goal', e.target.value); $('pb-goal').focus(); } });
 function renderNav() {
   renderBar();
+  if (!shareBox.hidden) syncShare();
   const w = checks();
   // the header pill counts the same warnings as the step badges, so it refreshes with them
   const warns = w.filter(c => c.lvl === 'warn').length, pill = $('crumb-pill');
@@ -2514,7 +2546,9 @@ document.addEventListener('click', e => {
     }
     if (a === 'restore') { importText = savedText || ''; savedText = null; renderControls(); $('importText').focus(); announce('Your text is back.'); }
     if (a === 'import') {
-      importReport = importConfig(importText);
+      const shared = readShareCode(importText);
+      if (shared) { Object.assign(S, shared); normalize(); save(); importReport = { applied: [], rounded: [], unknown: [], problems: [], shared: true }; }
+      else importReport = importConfig(importText);
       renderAll();
       const r = $('import-report'); r && r.focus();
       if (r && motionOK()) gsap.from(r.querySelectorAll('h4, .note, .report > div > b, li, code.key'), { opacity: 0, y: 8, duration: M.base, ease: M.ease, stagger: .045 });
@@ -2594,6 +2628,23 @@ themeBtn.addEventListener('click', () => {
   syncTheme(); announce(themeBtn.getAttribute('aria-label').split('.')[0]);
 });
 syncTheme();
+
+const shareBtn = $('share'), shareBox = $('sharebox');
+function syncShare() {
+  shareBtn.innerHTML = ic('copy') + (shareBox.hidden ? 'Share setup' : 'Hide sharing');
+  shareBtn.setAttribute('aria-expanded', String(!shareBox.hidden));
+  if (!shareBox.hidden) { $('share-link').value = shareLink(); $('share-code').value = shareCode(); }
+  shareBox.querySelectorAll('[data-copyshare]').forEach(b => { b.innerHTML = ic('copy') + `Copy ${b.dataset.copyshare}`; });
+}
+shareBtn.addEventListener('click', () => { shareBox.hidden = !shareBox.hidden; syncShare(); if (!shareBox.hidden) $('share-link').select(); });
+shareBox.addEventListener('click', e => {
+  const b = e.target.closest('[data-copyshare]'); if (!b) return;
+  const inp = $(`share-${b.dataset.copyshare}`), done = ok => { b.innerHTML = ic(ok ? 'check' : 'copy') + (ok ? 'Copied' : 'Selected, press Ctrl+C'); announce(ok ? `${b.dataset.copyshare} copied` : 'Selected. Press Ctrl+C to copy.'); setTimeout(syncShare, 1800); };
+  inp.select();
+  try { navigator.clipboard.writeText(inp.value).then(() => done(true), () => done(false)); } catch (err) { done(false); }
+});
+syncShare();
+if (fromLink) { try { history.replaceState(null, '', '#' + STEPS[0].id); } catch (e) {} }
 
 normalize();
 if (window.gsap) document.documentElement.classList.add('has-gsap');
