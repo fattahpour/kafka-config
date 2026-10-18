@@ -1,0 +1,13 @@
+{
+  "name": "kafka-pilot",
+  "private": true,
+  "description": "Interactive Kafka producer, broker and consumer configuration guide",
+  "scripts": {
+    "test": "node tests/run.js",
+    "test:kafka": "bash tests/kafka-smoke.sh"
+  },
+  "devDependencies": {
+    "darkreader": "^4.9.133",
+    "playwright-core": "1.58.2"
+  }
+}
