@@ -1,0 +1,2538 @@
+<title>Kafka Pilot</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="color-scheme" content="light dark">
+<script>
+/* Dark Reader repaints every page unless it finds a darkreader-lock meta in <head> (it only watches <head>).
+   Kafka Pilot has its own dark theme, so it locks Dark Reader out, and if Dark Reader was on, it switches to
+   that theme instead. A theme the person picked with the page's own switch always wins. */
+(function () {
+  var d = document, root = d.documentElement, pick = null;
+  try { pick = localStorage.getItem('kafka-pilot-theme'); } catch (e) {}
+  var dr = !!d.querySelector('meta[name="darkreader"]') || root.hasAttribute('data-darkreader-mode') || root.hasAttribute('data-darkreader-scheme');
+  if (pick === 'light' || pick === 'dark') root.setAttribute('data-theme', pick);
+  else if (dr) root.setAttribute('data-theme', 'dark');
+  var lock = d.createElement('meta'); lock.name = 'darkreader-lock';
+  (d.head || root).appendChild(lock);
+})();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a full-page app shell. A sidebar holds the five steps; the main column has a short header,
+   the transit-map diagram (producer > broker tracks > consumer group) on a dotted canvas, then the
+   step questions beside a plain-language readout and the live config file. Below 1024px the sidebar
+   folds into a top bar with the steps in a row. */
+:root {
+  --paper: #F7F8F8;      /* page */
+  --side: #F1F2F4;       /* sidebar */
+  --surface: #FFFFFF;    /* cards */
+  --lane: #F3F4F6;       /* broker columns inside the diagram */
+  --ink: #1B1C1F;
+  --ink-2: #3C3F45;
+  --muted: #62666D;
+  --rule: #E2E4E7;
+  --rule-2: #D0D6E0;
+  --accent: #5E6AD2;
+  --on-accent: #FFFFFF;
+  --producer: #187551;   /* green line: your app writing */
+  --broker: #5561CC;     /* indigo line: storage */
+  --consumer: #A6408F;   /* pink line: your services reading */
+  --ok: #1F7A4D;
+  --warn: #A5650A;
+  --danger: #BD3526;
+  --ack: #0A73A0;        /* sky line: confirmations travelling back */
+  --group2: #B4540F;     /* second consumer group */
+  --group3: #7B3FC4;     /* third consumer group */
+  --sans: "Inter", "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --code-bg: color-mix(in srgb, var(--paper) 70%, var(--surface));
+  --grid: color-mix(in srgb, var(--ink) 9%, transparent);
+  --glow: color-mix(in srgb, var(--accent) 9%, transparent);
+  --shadow: 0 1px 2px rgba(8, 9, 10, .05), 0 0 0 1px var(--rule);
+  --ease: cubic-bezier(.25, .46, .45, .94);
+  --role: var(--broker);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #08090A; --side: #0C0D0E; --surface: #101113; --lane: #17181B;
+    --ink: #F7F8F8; --ink-2: #D0D6E0; --muted: #8A8F98; --rule: #23252A; --rule-2: #383B3F;
+    --producer: #4CB782; --broker: #8C95F0; --consumer: #F79CE0;
+    --ok: #4CB782; --warn: #F0A54A; --danger: #EB5757; --ack: #4FC3F7; --group2: #F59E57; --group3: #C29BFA;
+    --grid: rgba(255, 255, 255, .055); --glow: rgba(94, 106, 210, .14);
+    --shadow: 0 0 0 1px var(--rule), 0 8px 24px rgba(0, 0, 0, .35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #08090A; --side: #0C0D0E; --surface: #101113; --lane: #17181B;
+  --ink: #F7F8F8; --ink-2: #D0D6E0; --muted: #8A8F98; --rule: #23252A; --rule-2: #383B3F;
+  --producer: #4CB782; --broker: #8C95F0; --consumer: #F79CE0;
+  --ok: #4CB782; --warn: #F0A54A; --danger: #EB5757; --ack: #4FC3F7; --group2: #F59E57; --group3: #C29BFA;
+  --grid: rgba(255, 255, 255, .055); --glow: rgba(94, 106, 210, .14);
+  --shadow: 0 0 0 1px var(--rule), 0 8px 24px rgba(0, 0, 0, .35);
+  color-scheme: dark;
+}
+
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.55; margin: 0;
+  font-feature-settings: "cv01", "ss03"; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+}
+*, *::before, *::after { box-sizing: border-box; }
+:focus-visible { outline: 2px solid var(--role); outline-offset: 2px; }
+::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+
+/* Shell */
+.app { min-height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr); }
+.side {
+  background: var(--side); border-bottom: 1px solid var(--rule);
+  padding: calc(12px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+  display: grid; gap: 12px; align-content: start;
+}
+.main {
+  min-width: 0; display: grid; gap: 20px; align-content: start;
+  padding: 24px max(16px, env(safe-area-inset-right, 0px)) 56px max(16px, env(safe-area-inset-left, 0px));
+  background: radial-gradient(70% 320px at 50% 0, var(--glow), transparent) no-repeat;
+}
+.main > * { width: 100%; max-width: 1560px; margin-inline: auto; }
+@media (min-width: 1024px) {
+  .app { grid-template-columns: 252px minmax(0, 1fr); }
+  .side {
+    position: sticky; top: 0; height: 100dvh; overflow-y: auto; border-bottom: 0; border-right: 1px solid var(--rule);
+    padding: calc(18px + env(safe-area-inset-top, 0px)) 12px 18px max(12px, env(safe-area-inset-left, 0px));
+    grid-template-rows: auto auto 1fr; gap: 22px;
+  }
+  .main { padding: 32px max(32px, env(safe-area-inset-right, 0px)) 64px 32px; gap: 24px; }
+}
+
+/* Brand */
+.brand { display: flex; align-items: center; gap: 10px; padding-inline: 6px; }
+.brand svg { flex: none; }
+.theme-btn { margin-left: auto; width: 34px; height: 34px; display: inline-grid; place-items: center; border: 1px solid var(--rule-2); border-radius: 8px; background: var(--surface); color: var(--ink-2); cursor: pointer; }
+.theme-btn:hover { color: var(--ink); border-color: var(--muted); }
+@media (pointer: coarse) { .theme-btn { width: 44px; height: 44px; } }
+h1 { font-size: 15px; font-weight: 590; letter-spacing: -0.01em; line-height: 1; margin: 0; }
+.side-label { display: none; margin: 0 0 6px; padding-inline: 10px; font-size: 12px; font-weight: 510; color: var(--muted); }
+.side-foot { display: none; margin: 0; padding: 12px; border-radius: 8px; border: 1px solid var(--rule); background: var(--surface); font-size: 13px; color: var(--muted); line-height: 1.5; }
+@media (min-width: 1024px) { .side-foot { display: block; align-self: end; } .side-label { display: block; } }
+
+/* Header */
+.top { display: grid; gap: 10px; }
+.crumb { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; font-size: 13px; color: var(--muted); font-weight: 510; }
+.crumb .sep { color: var(--muted); }
+.pill {
+  display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; border-radius: 999px;
+  border: 1px solid var(--rule); background: var(--surface); color: var(--ink-2); font-size: 12px; font-weight: 510;
+}
+.pill i { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+.pill.warn i { background: var(--warn); }
+.lede { margin: 0; font-size: clamp(1.625rem, 1.2rem + 1.4vw, 2.25rem); font-weight: 590; letter-spacing: -0.022em; line-height: 1.1; text-wrap: balance; }
+.lede span { color: var(--muted); }
+.top p.sub-lede { margin: 0; max-width: 64ch; color: var(--muted); font-size: 15px; text-wrap: pretty; }
+
+/* Steps: a vertical list in the sidebar, a row of numbered tabs below 1024px */
+.steps { position: relative; }
+.steps ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.steps button {
+  width: 100%; min-width: 44px; min-height: 48px; display: flex; align-items: center; gap: 10px; padding: 10px 4px 8px;
+  border: 0; border-top: 3px solid var(--rule); background: transparent;
+  font: inherit; font-size: 14px; font-weight: 510; color: var(--muted); text-align: left; cursor: pointer;
+  transition: color .16s var(--ease), background-color .16s var(--ease);
+}
+.steps button:hover { color: var(--ink); }
+.steps .n {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; flex: none;
+  border-radius: 6px; border: 1px solid var(--rule-2); background: var(--surface); font-size: 12px; font-weight: 590;
+  font-variant-numeric: tabular-nums; transition: background-color .16s var(--ease), border-color .16s var(--ease), color .16s var(--ease);
+}
+.steps button[aria-current="step"] { color: var(--ink); border-top-color: var(--c); }
+.steps button[aria-current="step"] .n { background: var(--c); border-color: var(--c); color: var(--surface); }
+.steps .badge {
+  margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px;
+  background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn);
+  font-size: 12px; font-weight: 590; display: inline-grid; place-items: center;
+}
+.rail { display: none; position: absolute; top: 0; left: 0; width: 0; height: 3px; border-radius: 2px; z-index: 1; transition: background-color .3s; }
+.has-gsap .rail { display: block; }
+.has-gsap .steps button[aria-current="step"] { border-top-color: var(--rule); }
+@media (min-width: 1024px) {
+  .steps ol { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .steps button { min-height: 40px; padding: 8px 10px 8px 12px; border: 0; border-radius: 6px; }
+  .steps button:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+  .steps button[aria-current="step"] { background: color-mix(in srgb, var(--ink) 7%, transparent); box-shadow: inset 2px 0 0 var(--c); }
+  .has-gsap .steps button[aria-current="step"] { box-shadow: none; }
+  .rail { width: 2px; }
+}
+@media (max-width: 680px) {
+  .steps ol { display: flex; }
+  .steps li { flex: none; min-width: 0; }
+  .steps li:has([aria-current="step"]) { flex: 1; }
+  .steps .name { display: none; }
+  .steps button[aria-current="step"] .name { display: inline; }
+  .steps .badge { display: none; }
+}
+
+/* Diagram */
+.stage {
+  background: var(--surface); border-radius: 12px; box-shadow: var(--shadow); padding: 14px 16px 12px; display: grid; gap: 8px;
+  background-image: radial-gradient(var(--grid) 1px, transparent 1.2px); background-size: 22px 22px; background-position: 11px 11px;
+}
+.stage-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.stage-head h2 { font-size: 13px; font-weight: 510; color: var(--muted); letter-spacing: 0; }
+.live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 510; color: var(--muted); }
+.live i { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent); }
+.stage-scroll { overflow-x: auto; }
+#map { display: block; width: 100%; min-width: 660px; height: auto; }
+.scroll-hint { display: none; margin: 0; font-size: 14px; color: var(--muted); }
+@media (max-width: 680px) {
+  /* keep diagram labels at a readable size on phones; the diagram scrolls sideways instead */
+  #map { min-width: 1000px; }
+  .scroll-hint { display: block; }
+}
+#map text { font-family: var(--sans); fill: var(--ink); font-size: 13px; }
+#map .lbl { font-weight: 590; font-size: 13.5px; letter-spacing: -0.005em; }
+#map .muted { fill: var(--muted); font-size: 12px; }
+#map .halo { paint-order: stroke; stroke: var(--surface); stroke-width: 5px; stroke-linejoin: round; }
+#map .zone { transition: opacity .3s; }
+#map[data-focus="cluster"] .z-p, #map[data-focus="cluster"] .z-c,
+#map[data-focus="producer"] .z-c, #map[data-focus="producer"] .z-b,
+#map[data-focus="consumer"] .z-p, #map[data-focus="consumer"] .z-b { opacity: .28; }
+.hatch-bg { fill: var(--lane); }
+.hatch-ln { stroke: var(--rule-2); stroke-width: 3; }
+.track { stroke: var(--broker); stroke-width: 2; opacity: .4; }
+.track.blocked { stroke: var(--danger); stroke-dasharray: 5 4; opacity: .9; animation: refuse 0.9s linear infinite; }
+/* refused tracks crawl backwards toward the producer, the direction the refused write travels */
+@keyframes refuse { to { stroke-dashoffset: 18; } }
+.cell { transition: fill .2s; }
+.cell.L { fill: var(--broker); }
+.cell.F { fill: var(--surface); stroke: var(--broker); stroke-width: 1.5; }
+.cell.F.got { fill: color-mix(in srgb, var(--broker) 35%, var(--surface)); }
+.cell.X { fill: var(--surface); stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 3 3; }
+#map text.ct { font-size: 12px; font-weight: 650; text-anchor: middle; pointer-events: none; }
+#map text.ct.L { fill: var(--surface); }
+#map text.ct.F { fill: var(--broker); }
+#map text.ct.X { fill: var(--muted); font-weight: 400; }
+#map text.pl { font-weight: 650; font-size: 12px; }
+#map text.pl.bad { fill: var(--danger); }
+.route-p { fill: none; stroke: var(--producer); stroke-width: 2.5; opacity: .5; stroke-linejoin: round; stroke-linecap: round; }
+.route-c { fill: none; stroke: var(--consumer); stroke-width: 2.5; opacity: .5; stroke-linejoin: round; stroke-linecap: round; }
+.station-p { fill: var(--producer); transition: fill .2s; }
+.station-p.fail { fill: var(--danger); }
+.station-c { fill: var(--surface); stroke: var(--consumer); stroke-width: 3; transition: fill .15s; }
+.station-c.hit { fill: var(--consumer); }
+.station-c.idle { stroke: var(--muted); stroke-dasharray: 3 3; }
+.bhead { cursor: pointer; outline: none; }
+.bchip { fill: var(--surface); stroke: var(--rule-2); stroke-width: 1; transition: stroke .15s; }
+.bhead:hover .bchip { stroke: var(--broker); }
+.bhead:focus-visible .bchip { stroke: var(--broker); stroke-width: 2.5; }
+.bchip.off { fill: url(#hatch); stroke: var(--danger); stroke-dasharray: 4 3; }
+#map text.bn { font-size: 12.5px; }
+#map text.bs { font-size: 11px; }
+#map text.bs.off-t, #map text.bn.off-t { fill: var(--danger); }
+.pico { color: var(--surface); }
+.part-n { fill: var(--surface); stroke: var(--producer); stroke-width: 1.5; }
+#map text.pn { font-family: var(--mono); font-size: 11.5px; font-weight: 600; fill: var(--producer); text-anchor: middle; }
+/* partition logs: read (faded), committed (solid), not yet copied to every in-sync replica (dashed) */
+.tape-bg { fill: var(--lane); stroke: var(--rule); stroke-width: 1; }
+.tape-bg.blocked { stroke: var(--danger); stroke-dasharray: 4 3; }
+.tape.offline .tape-bg { fill: url(#hatch); }
+.tape.offline .slot, .tape.offline .so { opacity: .35; }
+.slot { transition: fill .25s; }
+.slot.empty { fill: none; }
+.slot.read { fill: color-mix(in srgb, var(--producer) 22%, var(--lane)); }
+.slot.ok { fill: var(--producer); }
+.slot.new { fill: var(--surface); stroke: var(--producer); stroke-width: 1.3; stroke-dasharray: 3 2; }
+#map text.so { font-size: 11px; font-weight: 590; text-anchor: middle; pointer-events: none; font-variant-numeric: tabular-nums; }
+#map text.so.ok { fill: var(--surface); }
+#map text.so.read { fill: var(--ink-2); }
+#map text.so.new { fill: var(--producer); }
+.cur { fill: var(--consumer); }
+#map text.lag { font-size: 11.5px; font-weight: 590; fill: var(--consumer); }
+#map text.off-t { fill: var(--danger); }
+.rico { color: var(--muted); pointer-events: none; }
+.rico.r-p { color: var(--producer); } .rico.r-b { color: var(--broker); } .rico.r-c { color: var(--consumer); } .rico.off-t { color: var(--danger); }
+.cic { color: var(--consumer); pointer-events: none; transition: color .15s; }
+.cic.idle { color: var(--muted); }
+.station-c.hit + .cic { color: var(--surface); }
+.legend .ic.r-p { color: var(--producer); } .legend .ic.r-b { color: var(--broker); } .legend .ic.r-c { color: var(--consumer); }
+.legend li.role + li:not(.role) { margin-left: 8px; padding-left: 16px; border-left: 1px solid var(--rule); }
+.dot { fill: var(--producer); }
+.dot.ack { fill: var(--ack); stroke: var(--surface); stroke-width: 1.5; }
+#map text.retlbl { font-size: 11px; font-weight: 590; fill: var(--ack); }
+#map text.retlbl.err { fill: var(--danger); }
+#map text.retlbl.try { fill: var(--producer); }
+#map text.keylbl { font-size: 11.5px; font-weight: 590; fill: var(--producer); }
+.dot.err { fill: var(--danger); }
+.dot.rep { fill: var(--broker); }
+.dot.read { fill: var(--consumer); }
+/* consumer groups: pink, orange, violet */
+.g0 { --gc: var(--consumer); } .g1 { --gc: var(--group2); } .g2 { --gc: var(--group3); }
+.route-c.g1, .route-c.g2 { stroke: var(--gc); }
+.station-c.g1, .station-c.g2 { stroke: var(--gc); }
+.station-c.g1.hit, .station-c.g2.hit { fill: var(--gc); }
+.cic.g1, .cic.g2 { color: var(--gc); }
+.cur.g1, .cur.g2, .dot.read.g1, .dot.read.g2 { fill: var(--gc); }
+#map text.lag tspan.g0 { fill: var(--consumer); } #map text.lag tspan.g1 { fill: var(--group2); } #map text.lag tspan.g2 { fill: var(--group3); }
+.gtag { fill: var(--gc); }
+#map text.ghead { font-size: 12.5px; font-weight: 590; }
+/* sections of the pipeline */
+.lane { stroke-width: 1.2; }
+.lane.lp { fill: color-mix(in srgb, var(--producer) 3%, transparent); stroke: color-mix(in srgb, var(--producer) 38%, transparent); }
+.lane.lb { fill: color-mix(in srgb, var(--broker) 3%, transparent); stroke: color-mix(in srgb, var(--broker) 38%, transparent); }
+.lane.lc { fill: color-mix(in srgb, var(--consumer) 3%, transparent); stroke: color-mix(in srgb, var(--consumer) 38%, transparent); }
+#map text.lanet { font-size: 11px; font-weight: 650; letter-spacing: .08em; }
+#map text.lanet.lp { fill: var(--producer); } #map text.lanet.lb { fill: var(--broker); } #map text.lanet.lc { fill: var(--consumer); }
+/* consumer groups: own lane, own box */
+.route-c.bus { stroke-width: 3; opacity: .7; }
+.jn { fill: var(--gc); }
+.gframe { fill: var(--surface); stroke: color-mix(in srgb, var(--gc) 55%, transparent); stroke-width: 1.2; }
+.gname { cursor: pointer; outline: none; }
+.gname:hover .ghead, .gname:focus-visible .ghead { text-decoration: underline; }
+.gname[aria-pressed="true"] .gtag { stroke: var(--ink); stroke-width: 1.5; }
+.gctl { cursor: pointer; outline: none; }
+.gctl rect { fill: var(--surface); stroke: var(--rule-2); stroke-width: 1; }
+#map .gctl text { font-size: 12px; font-weight: 590; fill: var(--ink-2); pointer-events: none; }
+.gctl:hover rect { stroke: var(--gc); }
+.gctl:focus-visible rect { stroke: var(--gc); stroke-width: 2.5; }
+.gctl.off { opacity: .4; cursor: not-allowed; }
+#map text.gcount { font-size: 12.5px; font-weight: 650; }
+/* highlight one group: dim the others */
+#map[data-gf="0"] .gx:not(.g0), #map[data-gf="0"] .dot.read:not(.g0), #map[data-gf="0"] .cur:not(.g0),
+#map[data-gf="1"] .gx:not(.g1), #map[data-gf="1"] .dot.read:not(.g1), #map[data-gf="1"] .cur:not(.g1),
+#map[data-gf="2"] .gx:not(.g2), #map[data-gf="2"] .dot.read:not(.g2), #map[data-gf="2"] .cur:not(.g2) { opacity: .15; }
+/* moving dots never take the pointer, so a tooltip stays open while messages fly past */
+#dots, #ghosts { pointer-events: none; }
+.partbtn { cursor: pointer; outline: none; }
+.partbtn:hover .part-n { stroke-width: 2.5; }
+.partbtn:focus-visible .part-n { stroke-width: 3; }
+.hashcard:focus { outline: none; }
+.hashcard code { font-family: var(--mono); font-size: 12.5px; }
+.hsteps { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
+.hrows { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13.5px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.hrows b { color: var(--producer); }
+#hash-out { display: block; min-height: 1.4em; }
+.htry { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-weight: 590; font-size: 14px; }
+.htry .field { max-width: 220px; }
+.tip em { font-style: normal; font-weight: 650; }
+.tip { position: fixed; z-index: 60; max-width: 300px; padding: 9px 12px; border-radius: 8px; background: var(--ink); color: var(--paper); font-size: 13px; line-height: 1.45; box-shadow: 0 10px 30px rgba(8, 9, 10, .28); pointer-events: none; }
+.tip b { display: block; margin-bottom: 2px; font-weight: 650; }
+#map [data-tip], .legend [data-tip], .pcount[data-tip], .lag-groups [data-tip] { cursor: help; }
+#map .bhead, #map .ackseg, .pcount button { cursor: pointer; }
+.lagbox { display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 10px; background: var(--code-bg); font-size: 14px; }
+.lagbox:focus { outline: none; }
+.lag-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.lag-head .ic { color: var(--consumer); }
+.lag-head span { color: var(--muted); font-size: 13px; }
+.lag-groups { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.lag-groups li { display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); }
+.lag-groups i { width: 10px; height: 10px; border-radius: 3px; background: var(--gc); }
+.lag-groups b { font-variant-numeric: tabular-nums; min-width: 2ch; }
+.trend { font-size: 12.5px; font-weight: 590; color: var(--muted); }
+.trend.t-growing { color: var(--danger); } .trend.t-shrinking { color: var(--ok); }
+.lag-fix { display: grid; gap: 8px; padding: 10px 12px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--warn) 30%, var(--rule)); background: color-mix(in srgb, var(--warn) 8%, var(--surface)); }
+.lag-fix p { margin: 0; }
+.lag-fix ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+.lag-fix li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.lag-fix li span { flex: 1 1 320px; }
+.lag-ok { margin: 0; color: var(--muted); }
+.lag-more summary { cursor: pointer; font-weight: 590; min-height: 32px; display: flex; align-items: center; }
+.lag-more ul { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 6px; color: var(--ink-2); }
+.lag-more code { font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
+.gcard { display: grid; gap: 16px; padding: 16px; border: 1px solid var(--rule); border-left: 4px solid var(--gc); border-radius: 10px; background: var(--code-bg); }
+.gcard select.field { max-width: 460px; }
+
+.stage-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 20px; padding-top: 10px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; list-style: none; margin: 0; padding: 0; }
+.legend li { display: inline-flex; align-items: center; gap: 6px; }
+.legend svg { flex: none; }
+.legend .sw-L { fill: var(--broker); }
+.legend .sw-F { fill: var(--surface); stroke: var(--broker); stroke-width: 1.5; }
+.legend .sw-m { fill: var(--producer); }
+.legend .sw-ok { fill: var(--producer); }
+.legend .sw-new { fill: var(--surface); stroke: var(--producer); stroke-width: 1.3; stroke-dasharray: 3 2; }
+.legend .sw-cur { fill: var(--consumer); }
+.legend .sw-a { fill: var(--ack); }
+.legend .sw-e { fill: var(--danger); }
+#status { margin: 0; font-size: 14.5px; color: var(--ink-2); min-height: 1.5em; text-wrap: pretty; }
+
+/* Buttons */
+.link-btn, .btn {
+  font: inherit; font-size: 13.5px; font-weight: 510; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--rule-2); border-radius: 6px; padding: 5px 12px; min-height: 40px; cursor: pointer;
+  transition: border-color .1s var(--ease), background-color .1s var(--ease), color .1s var(--ease);
+}
+.link-btn:hover, .btn:hover { border-color: var(--muted); background: color-mix(in srgb, var(--ink) 4%, var(--surface)); }
+@media (pointer: coarse) { .link-btn, .btn { min-height: 44px; } }
+button, label, input, [role="button"] { touch-action: manipulation; }
+.btn { padding: 8px 16px; min-height: 44px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); box-shadow: 0 1px 2px rgba(8, 9, 10, .2), inset 0 1px 0 rgba(255, 255, 255, .14); }
+.btn.primary:hover { background: color-mix(in srgb, var(--accent) 88%, #fff); border-color: color-mix(in srgb, var(--accent) 88%, #fff); }
+.btn:disabled { visibility: hidden; }
+.skip { position: absolute; z-index: 30; left: max(16px, env(safe-area-inset-left, 0px)); top: calc(8px + env(safe-area-inset-top, 0px)); padding: 10px 16px; border-radius: 6px; background: var(--accent); color: var(--on-accent); font-weight: 510; text-decoration: none; transform: translateY(-300%); }
+.skip:focus { transform: none; }
+.field[aria-invalid="true"] { border-color: var(--danger); }
+.field-error { margin: 0; color: var(--danger); font-size: 14px; max-width: 62ch; }
+.field-msg { margin: 0; color: var(--muted); font-size: 14px; min-height: 1.4em; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* Work area */
+.work { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.work.wide { grid-template-columns: minmax(0, 1fr); }
+.work[data-role="producer"] { --role: var(--producer); }
+.work[data-role="consumer"] { --role: var(--consumer); }
+.work[data-role="broker"] { --role: var(--broker); }
+.work { --role-soft: color-mix(in srgb, var(--role) 10%, var(--surface)); }
+@media (max-width: 880px) { .work { grid-template-columns: minmax(0, 1fr); } .explain { position: static; } }
+/* the readout stays beside the questions while they scroll, and scrolls itself when taller than the screen */
+@media (min-width: 881px) { .explain { max-height: calc(100dvh - 48px - env(safe-area-inset-top, 0px)); overflow-y: auto; overscroll-behavior: contain; } }
+
+.controls { display: grid; gap: 28px; min-width: 0; padding: 24px; background: var(--surface); border-radius: 12px; box-shadow: var(--shadow); }
+@media (max-width: 560px) { .controls { padding: 18px 16px; } }
+.intro { display: grid; gap: 6px; padding-bottom: 20px; border-bottom: 1px solid var(--rule); }
+h2 { font-size: 22px; font-weight: 590; letter-spacing: -0.018em; line-height: 1.2; margin: 0; text-wrap: balance; }
+.intro p { margin: 0; color: var(--muted); max-width: 62ch; font-size: 15px; }
+
+.q { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; min-width: 0; }
+.qlabel { font-weight: 590; font-size: 15px; padding: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; letter-spacing: -0.005em; }
+code.key { font-family: var(--mono); font-size: 12px; font-weight: 400; color: color-mix(in srgb, var(--ink) 82%, var(--muted)); background: color-mix(in srgb, var(--ink) 6%, transparent); border: 1px solid var(--rule); padding: 0 6px; border-radius: 4px; }
+.help { margin: -4px 0 0; color: var(--muted); font-size: 14px; max-width: 62ch; }
+.help.after { margin: 0; }
+.stepq { align-content: start; grid-template-rows: minmax(1.6em, auto) auto auto; }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 168px), 1fr)); gap: 8px; }
+.tile {
+  position: relative; display: grid; align-content: start; gap: 3px; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 8px;
+  background: color-mix(in srgb, var(--ink) 1.5%, var(--surface)); cursor: pointer;
+  transition: border-color .16s var(--ease), background-color .16s var(--ease), box-shadow .16s var(--ease);
+}
+.tile:hover { border-color: color-mix(in srgb, var(--role) 45%, var(--rule)); }
+.tile input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.tile:has(input:checked) { border-color: var(--role); background: var(--role-soft); box-shadow: 0 0 0 1px var(--role); }
+.tile:has(input:focus-visible) { outline: 2px solid var(--role); outline-offset: 2px; }
+.tile:has(input:disabled) { opacity: .45; cursor: not-allowed; }
+.tile b { font-weight: 590; font-size: 14.5px; }
+.tile span { font-size: 13.5px; color: var(--muted); }
+.tile code.key { justify-self: start; }
+
+.stepper { display: inline-flex; align-items: center; width: max-content; border: 1px solid var(--rule-2); border-radius: 8px; background: var(--surface); }
+.stepper button { width: 44px; height: 44px; border: 0; background: transparent; font: inherit; font-size: 20px; line-height: 1; color: var(--ink); cursor: pointer; border-radius: 7px; }
+.stepper button:hover:not(:disabled) { background: var(--role-soft); }
+.stepper button:disabled { opacity: .38; cursor: not-allowed; }
+.stepper output { min-width: 3ch; text-align: center; font-weight: 590; font-size: 18px; font-variant-numeric: tabular-nums; }
+
+.range { display: flex; align-items: center; gap: 14px; max-width: 460px; }
+.range input { flex: 1; min-width: 0; height: 44px; margin: 0; accent-color: var(--role); cursor: pointer; }
+.range output { min-width: 6ch; font-weight: 590; font-variant-numeric: tabular-nums; }
+
+.field { font: inherit; padding: 9px 12px; min-height: 44px; border: 1px solid var(--rule-2); border-radius: 6px; background: var(--surface); color: var(--ink); width: 100%; max-width: 360px; transition: border-color .1s var(--ease), box-shadow .1s var(--ease); }
+.field:focus-visible { outline: none; border-color: var(--role); box-shadow: 0 0 0 3px color-mix(in srgb, var(--role) 22%, transparent); }
+.row2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 20px; }
+
+.switch { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; }
+.switch input { appearance: none; -webkit-appearance: none; width: 40px; height: 24px; border-radius: 12px; background: var(--rule-2); position: relative; flex: none; margin: 1px 0 0; cursor: pointer; transition: background .15s; }
+.switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .25); transition: transform .15s var(--ease); }
+.switch input:checked { background: var(--role); }
+.switch input:checked::after { transform: translateX(16px); }
+.switch input:disabled { opacity: .45; cursor: not-allowed; }
+.switch .txt { display: grid; gap: 2px; }
+
+textarea.field { max-width: none; min-height: 150px; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; resize: vertical; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.addrow { display: flex; flex-wrap: wrap; gap: 8px; }
+.addrow .field { flex: 1; min-width: 0; max-width: 280px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.chip { display: inline-flex; align-items: center; gap: 8px; padding: 0 0 0 12px; border: 1px solid var(--rule-2); border-radius: 999px; background: var(--surface); font-family: var(--mono); font-size: 12.5px; }
+.chip small { font-family: var(--sans); font-weight: 590; color: var(--role); font-size: 12.5px; }
+.chip button { width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); font: inherit; font-size: 16px; cursor: pointer; }
+.chip button:hover { background: var(--role-soft); color: var(--ink); }
+.report { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--rule); border-radius: 8px; background: var(--code-bg); }
+.report h4 { margin: 0; font-size: 15px; font-weight: 590; }
+.report ul { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; }
+.report code, .note code { font-family: var(--mono); font-size: 12.5px; }
+.keymap { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
+.keymap code { font-family: var(--mono); font-size: 12.5px; font-weight: 600; }
+.tl .bar { fill: var(--producer); }
+.tl .bar.hot { fill: var(--danger); }
+.sub { display: grid; gap: 28px; padding-top: 24px; border-top: 1px solid var(--rule); }
+.sub h3 { margin: 0; font-size: 17px; font-weight: 590; letter-spacing: -0.012em; line-height: 1.25; }
+.visual { display: grid; gap: 10px; padding: 14px; border-radius: 8px; background: var(--code-bg); border: 1px solid var(--rule); }
+.visual p { margin: 0; font-size: 14px; }
+.visual p.small { font-size: 13.5px; color: var(--muted); }
+.tl { display: block; width: 100%; height: auto; }
+.tl text { font-family: var(--sans); font-size: 12px; fill: var(--muted); }
+/* the timelines scale down with their panel (drawn 400 wide), so their labels grow as the panel narrows */
+.visual { container-type: inline-size; }
+@container (max-width: 440px) { .tl text { font-size: 14px; } }
+@container (max-width: 370px) { .tl text { font-size: 15.5px; } }
+@container (max-width: 310px) { .tl text { font-size: 17px; } }
+.tl text.in { fill: var(--surface); font-weight: 650; }
+.tl text.bad { fill: var(--danger); font-weight: 590; }
+.tl .base { fill: var(--surface); stroke: var(--rule-2); }
+.tl .linger { fill: var(--rule-2); }
+.tl .try { fill: var(--producer); }
+.tl .end { stroke: var(--danger); stroke-width: 2; }
+.tl .gone { fill: color-mix(in srgb, var(--danger) 22%, var(--surface)); }
+.tl .hb { stroke: var(--consumer); stroke-width: 2.5; }
+.tl .crash { fill: var(--danger); }
+.note { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 8px; font-size: 14px; border: 1px solid var(--rule); background: color-mix(in srgb, var(--muted) 6%, var(--surface)); }
+.note svg { flex: none; margin-top: 2px; }
+.note.warn { background: color-mix(in srgb, var(--warn) 9%, var(--surface)); border-color: color-mix(in srgb, var(--warn) 28%, var(--rule)); }
+.note.warn svg { color: var(--warn); }
+.note.info svg { color: var(--muted); }
+.note.ok { background: color-mix(in srgb, var(--ok) 9%, var(--surface)); border-color: color-mix(in srgb, var(--ok) 28%, var(--rule)); }
+.note.ok svg { color: var(--ok); }
+.note .go { margin-left: auto; flex: none; }
+.notes { display: grid; gap: 8px; }
+
+/* Readout */
+.explain { background: var(--surface); border-radius: 12px; box-shadow: var(--shadow); padding: 20px; display: grid; gap: 16px; min-width: 0; position: sticky; top: calc(24px + env(safe-area-inset-top, 0px)); }
+.explain h3 { margin: 0; font-size: 17px; font-weight: 590; letter-spacing: -0.012em; }
+.facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; font-size: 14.5px; color: var(--ink-2); }
+.facts li { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; align-items: start; }
+.facts li::before { content: ""; width: 16px; height: 16px; margin-top: 3px; background: var(--m, var(--role)); -webkit-mask: var(--mi) center / contain no-repeat; mask: var(--mi) center / contain no-repeat; }
+.facts .p { --m: var(--producer); --mi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10'/%3E%3Cpath d='M6 8h.01'/%3E%3Cpath d='M9 8h.01'/%3E%3C/svg%3E"); }
+.facts .b { --m: var(--broker); --mi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 7a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-2'/%3E%3Cpath d='M3 15a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3l0 -2'/%3E%3Cpath d='M7 8l0 .01'/%3E%3Cpath d='M7 16l0 .01'/%3E%3Cpath d='M11 8h6'/%3E%3Cpath d='M11 16h6'/%3E%3C/svg%3E"); }
+.facts .c { --m: var(--consumer); --mi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -12'/%3E%3Cpath d='M4 13h3l3 3h4l3 -3h3'/%3E%3C/svg%3E"); }
+
+.file { display: grid; gap: 0; min-width: 0; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: var(--code-bg); }
+.file-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 6px 6px 14px; border-bottom: 1px solid var(--rule); background: var(--surface); }
+.file-head b { font-family: var(--mono); font-size: 12.5px; font-weight: 600; }
+.file-head span { color: var(--muted); font-size: 12.5px; }
+.file pre { margin: 0; padding: 14px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.7; white-space: pre; tab-size: 2; }
+.file pre .c { color: var(--muted); }
+.file pre .k { color: var(--role); font-weight: 600; }
+.file[data-r="producer"] { --role: var(--producer); }
+.file[data-r="consumer"] { --role: var(--consumer); }
+.file[data-r="broker"] { --role: var(--broker); }
+.files { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: 16px; align-items: start; }
+
+.ic { flex: none; display: inline-block; vertical-align: -3px; }
+.link-btn, .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.steps .si { display: inline-flex; color: var(--muted); margin-left: -2px; }
+.steps button[aria-current="step"] .si, .steps button:hover .si { color: var(--c); }
+@media (min-width: 681px) { .steps .n { display: none; } .steps .si { margin-left: 0; } }
+@media (max-width: 680px) { .steps .si { display: none; } }
+.tile .ti { display: grid; place-items: center; width: 30px; height: 30px; margin-bottom: 6px; border-radius: 7px; color: var(--role); background: color-mix(in srgb, var(--role) 11%, var(--surface)); border: 1px solid color-mix(in srgb, var(--role) 22%, var(--rule)); }
+.stepper button, .chip button { display: inline-grid; place-items: center; }
+.fname { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.fname .ic { color: var(--role); }
+.pbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-bottom: 10px; border-bottom: 1px solid var(--rule); }
+.pselect { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding-left: 10px; border: 1px solid var(--rule-2); border-radius: 8px; background: var(--surface); color: var(--muted); }
+.pselect select { height: 36px; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 13.5px; font-weight: 510; padding: 0 8px 0 2px; cursor: pointer; border-radius: 0 8px 8px 0; }
+.pselect:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.pselect select:focus-visible { outline: none; }
+.pcount { display: inline-flex; align-items: center; gap: 2px; height: 38px; padding: 0 3px 0 10px; border: 1px solid var(--rule-2); border-radius: 8px; background: var(--surface); font-size: 13px; font-weight: 510; }
+.pcount .pct { margin: 0 4px 0 4px; color: var(--ink-2); }
+.pcount output { min-width: 2ch; text-align: center; font-weight: 650; font-variant-numeric: tabular-nums; }
+.pcount button { width: 30px; height: 30px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); cursor: pointer; display: inline-grid; place-items: center; }
+.pcount button:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.pcount button:disabled { opacity: .35; cursor: not-allowed; }
+@media (pointer: coarse) { .pcount, .pselect { height: 44px; } .pcount button { width: 38px; height: 38px; } .pselect select { height: 42px; } }
+@media (max-width: 760px) { .pcount .pct { display: none; } }
+.pcount .ic.r-p, .pselect .ic { color: var(--producer); } .pcount .ic.r-b { color: var(--broker); } .pcount .ic.r-c { color: var(--consumer); } .pcount .ic.r-n { color: var(--muted); }
+.pselect .ic { color: var(--muted); }
+.ackseg { cursor: pointer; outline: none; }
+.ackseg rect { fill: var(--surface); stroke: var(--rule-2); stroke-width: 1; transition: fill .15s, stroke .15s; }
+.ackseg text { font-size: 12px; font-weight: 590; fill: var(--ink-2); pointer-events: none; }
+.ackseg:hover rect { stroke: var(--producer); }
+.ackseg:focus-visible rect { stroke: var(--producer); stroke-width: 2.5; }
+.ackseg.on rect { fill: var(--producer); stroke: var(--producer); }
+#map .ackseg.on text { fill: var(--surface); }
+.pgoal { flex: 1; display: flex; }
+.stage-head h2 { display: inline-flex; align-items: center; gap: 6px; }
+.side-foot .ic { vertical-align: -2px; margin-right: 6px; color: var(--ink-2); }
+.pager { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  #map .zone, .cell, .station-c, .switch input, .switch input::after, .rail, .steps button, .steps .n, .tile, .field, .btn, .link-btn { transition: none; }
+  .track.blocked { animation: none; }
+}
+</style>
+
+<div class="app">
+  <a class="skip" id="skip" href="#controls">Skip to the questions</a>
+  <p id="announce" class="sr" aria-live="polite"></p>
+  <div class="tip" id="tip" role="tooltip" hidden></div>
+  <aside class="side">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 44 44" aria-hidden="true">
+        <rect x="1" y="1" width="42" height="42" rx="11" fill="var(--surface)" stroke="var(--rule-2)" stroke-width="1.5"/>
+        <path d="M10 14h24" stroke="var(--producer)" stroke-width="3.5" stroke-linecap="round"/>
+        <path d="M10 22h24" stroke="var(--broker)" stroke-width="3.5" stroke-linecap="round"/>
+        <path d="M10 30h24" stroke="var(--consumer)" stroke-width="3.5" stroke-linecap="round"/>
+        <circle cx="16" cy="14" r="3.6" fill="var(--surface)" stroke="var(--producer)" stroke-width="2.6"/>
+        <circle cx="24" cy="22" r="3.6" fill="var(--surface)" stroke="var(--broker)" stroke-width="2.6"/>
+        <circle cx="29" cy="30" r="3.6" fill="var(--surface)" stroke="var(--consumer)" stroke-width="2.6"/>
+      </svg>
+      <h1>Kafka Pilot</h1>
+      <button type="button" class="theme-btn" id="theme"></button>
+    </div>
+    <nav class="steps" aria-label="Setup steps"><p class="side-label">Setup</p><span class="rail" id="rail" aria-hidden="true"></span><ol id="steps"></ol></nav>
+    <p class="side-foot"><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/></svg>Every answer redraws the diagram and rewrites the config files. Nothing leaves this page.</p>
+  </aside>
+
+  <main class="main" id="main">
+    <header class="top">
+      <p class="crumb"><span>Kafka Pilot</span><span class="sep" aria-hidden="true">/</span><span id="crumb-step"></span><span class="pill" id="crumb-pill"><i aria-hidden="true"></i><span></span></span></p>
+      <p class="lede">Configure Kafka in five plain questions. <span>See it, then copy it.</span></p>
+      <p class="sub-lede">Answer a few questions about your topic. Watch the diagram change, then copy working producer, broker and consumer configs.</p>
+    </header>
+
+    <section class="stage" aria-label="Live diagram of your Kafka setup">
+      <div class="stage-head"><h2><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M19 7a2 2 0 1 0 0 -4a2 2 0 0 0 0 4"/><path d="M11 19h5.5a3.5 3.5 0 0 0 0 -7h-8a3.5 3.5 0 0 1 0 -7h4.5"/></svg>Pipeline</h2><span class="pgoal" id="pgoal"></span><span class="live"><i aria-hidden="true"></i>Live</span></div>
+      <div class="pbar" id="pbar" role="toolbar" aria-label="Change the pipeline"></div>
+      <p class="scroll-hint">Swipe sideways to see the whole diagram.</p>
+      <div class="stage-scroll"><svg id="map" role="group" viewBox="0 0 1000 400"></svg></div>
+      <p id="status" aria-live="polite"></p>
+      <div class="lagbox" id="lagbox" tabindex="-1" aria-label="Consumer lag"></div>
+      <div class="stage-foot">
+        <ul class="legend">
+          <li class="role" data-tip="leg:prod"><svg class="ic r-p" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10"/><path d="M6 8h.01"/><path d="M9 8h.01"/></svg>Producer</li><li class="role" data-tip="leg:role-broker"><svg class="ic r-b" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-2"/><path d="M3 15a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3l0 -2"/><path d="M7 8l0 .01"/><path d="M7 16l0 .01"/><path d="M11 8h6"/><path d="M11 16h6"/></svg>Broker</li><li class="role" data-tip="leg:role-consumer"><svg class="ic r-c" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -12"/><path d="M4 13h3l3 3h4l3 -3h3"/></svg>Consumer</li>
+          <li data-tip="leg:leader"><svg width="20" height="14" aria-hidden="true"><rect class="sw-L" x="1" y="1" width="18" height="12" rx="3"/></svg>Leader copy</li>
+          <li data-tip="leg:follower"><svg width="20" height="14" aria-hidden="true"><rect class="sw-F" x="1.5" y="1.5" width="17" height="11" rx="3"/></svg>Follower copy</li>
+          <li data-tip="leg:saved"><svg width="14" height="14" aria-hidden="true"><rect class="sw-ok" x="1" y="1" width="12" height="12" rx="2.5"/></svg>Saved message</li>
+          <li data-tip="leg:new"><svg width="14" height="14" aria-hidden="true"><rect class="sw-new" x="1.5" y="1.5" width="11" height="11" rx="2.5"/></svg>Not copied yet</li>
+          <li data-tip="leg:cursor"><svg width="12" height="12" aria-hidden="true"><path class="sw-cur" d="M6 2l5 8H1z"/></svg>Read position</li>
+          <li data-tip="leg:msg"><svg width="12" height="12" aria-hidden="true"><circle class="sw-m" cx="6" cy="6" r="5"/></svg>Message</li>
+          <li data-tip="leg:ack"><svg width="12" height="12" aria-hidden="true"><circle class="sw-a" cx="6" cy="6" r="4"/></svg>Confirmation (ack)</li>
+          <li data-tip="leg:err"><svg width="12" height="12" aria-hidden="true"><circle class="sw-e" cx="6" cy="6" r="5"/></svg>Refused write (error)</li>
+        </ul>
+        <button type="button" class="link-btn" id="play">Pause animation</button>
+      </div>
+    </section>
+
+    <div class="work" id="work">
+      <div class="controls" id="controls"></div>
+      <aside class="explain" id="explain" aria-live="polite"></aside>
+    </div>
+
+    <div class="pager">
+      <button type="button" class="btn" id="back"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l14 0"/><path d="M5 12l6 6"/><path d="M5 12l6 -6"/></svg>Back</button>
+      <button type="button" class="btn primary" id="next">Next</button>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+(() => {
+const STEPS = [
+  { id: 'goal', icon: 'target-arrow', name: 'Goal', role: 'broker', focus: 'all' },
+  { id: 'cluster', icon: 'server-2', name: 'Cluster', role: 'broker', focus: 'cluster' },
+  { id: 'producer', icon: 'app-window', name: 'Producer', role: 'producer', focus: 'producer' },
+  { id: 'consumer', icon: 'inbox', name: 'Consumer', role: 'consumer', focus: 'consumer' },
+  { id: 'files', icon: 'file-code', name: 'Your files', role: 'broker', focus: 'all' },
+];
+const PRESETS = {
+  // The default: one of everything, so a newcomer sees the smallest working setup and grows it from the pipeline
+  starter: { label: 'Getting started', hint: 'One producer, one broker, one consumer. Add more as you learn.',
+    producers: 1, brokers: 1, partitions: 3, rf: 1, minIsr: 1, retention: 7, maxMsgMB: 1, replicaLag: 30,
+    acks: 'all', idem: true, linger: 5, batch: 16, compression: 'lz4',
+    retries: 'max', deliveryTimeout: 120, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
+    consumers: 1, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', onFail: 'dlq' },
+  safe: { label: 'Never lose a message', hint: 'Payments, orders, anything you must not drop.',
+    producers: 2, brokers: 3, partitions: 6, rf: 3, minIsr: 2, retention: 30, maxMsgMB: 1, replicaLag: 30,
+    acks: 'all', idem: true, linger: 5, batch: 16, compression: 'lz4',
+    retries: 'max', deliveryTimeout: 300, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
+    consumers: 3, reset: 'earliest', autoCommit: false, maxPoll: 200, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', onFail: 'dlq' },
+  balanced: { label: 'Balanced', hint: 'A safe starting point for most services.',
+    producers: 2, brokers: 3, partitions: 6, rf: 3, minIsr: 2, retention: 7, maxMsgMB: 1, replicaLag: 30,
+    acks: 'all', idem: true, linger: 10, batch: 64, compression: 'lz4',
+    retries: 'max', deliveryTimeout: 120, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
+    consumers: 3, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', onFail: 'dlq' },
+  bulk: { label: 'Move lots of data', hint: 'Logs, metrics, clicks. Losing a rare message is acceptable.',
+    producers: 3, brokers: 3, partitions: 12, rf: 2, minIsr: 1, retention: 1, maxMsgMB: 1, replicaLag: 30,
+    acks: '1', idem: false, linger: 50, batch: 256, compression: 'zstd',
+    retries: 'max', deliveryTimeout: 120, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
+    consumers: 4, reset: 'latest', autoCommit: true, maxPoll: 1000, fetchMin: 65536, sessionTimeout: 45, pollInterval: 10, speed: 'fast', onFail: 'dlq' },
+  fast: { label: 'Lowest delay', hint: 'Live dashboards, chat, alerts.',
+    producers: 2, brokers: 3, partitions: 6, rf: 3, minIsr: 2, retention: 1, maxMsgMB: 1, replicaLag: 30,
+    acks: '1', idem: false, linger: 0, batch: 16, compression: 'none',
+    retries: '3', deliveryTimeout: 30, requestTimeout: 10, retryBackoff: 50, maxInFlight: 5, maxBlock: 5,
+    consumers: 3, reset: 'latest', autoCommit: true, maxPoll: 100, fetchMin: 1, sessionTimeout: 15, pollInterval: 1, speed: 'fast', onFail: 'dlq' },
+  // Slow work per message: small polls and a long time limit, so a busy consumer is not thrown out of the group
+  jobs: { label: 'Background jobs', hint: 'Emails to send, images to resize. Each one takes a while.',
+    producers: 2, brokers: 3, partitions: 12, rf: 3, minIsr: 2, retention: 7, maxMsgMB: 1, replicaLag: 30,
+    acks: 'all', idem: true, linger: 5, batch: 16, compression: 'lz4',
+    retries: 'max', deliveryTimeout: 120, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
+    consumers: 6, reset: 'earliest', autoCommit: false, maxPoll: 10, fetchMin: 1, sessionTimeout: 45, pollInterval: 15, speed: 'slow', onFail: 'dlq' },
+  // Huge numbers of tiny readings: batch and compress hard, keep only 2 copies, and keep each device's readings
+  // in order (idempotence), so a retried old reading never lands after a newer one
+  iot: { label: 'Sensor and device data', hint: 'Many small readings from devices. The newest matters most.',
+    producers: 4, brokers: 3, partitions: 12, rf: 2, minIsr: 1, retention: 1, maxMsgMB: 1, replicaLag: 30,
+    acks: 'all', idem: true, linger: 25, batch: 64, compression: 'zstd',
+    retries: 'max', deliveryTimeout: 60, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 30,
+    consumers: 4, reset: 'latest', autoCommit: true, maxPoll: 1000, fetchMin: 65536, sessionTimeout: 45, pollInterval: 10, speed: 'fast', onFail: 'dlq' },
+  // Row changes from a database: never lose one, keep order per row, so a failing change is retried, not skipped
+  cdc: { label: 'Database changes', hint: 'Row updates copied to other systems (CDC). Order per row matters.',
+    producers: 1, brokers: 3, partitions: 6, rf: 3, minIsr: 2, retention: 7, maxMsgMB: 5, replicaLag: 30,
+    acks: 'all', idem: true, linger: 10, batch: 64, compression: 'lz4',
+    retries: 'max', deliveryTimeout: 300, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
+    consumers: 3, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', onFail: 'retry' },
+  // A history kept for a month so it can be replayed or checked later; few writers, compressed well
+  audit: { label: 'Audit and history log', hint: 'Who did what and when. Kept to replay or check later.',
+    producers: 2, brokers: 3, partitions: 3, rf: 3, minIsr: 2, retention: 30, maxMsgMB: 1, replicaLag: 30,
+    acks: 'all', idem: true, linger: 20, batch: 64, compression: 'zstd',
+    retries: 'max', deliveryTimeout: 300, requestTimeout: 30, retryBackoff: 100, maxInFlight: 5, maxBlock: 60,
+    consumers: 2, reset: 'earliest', autoCommit: false, maxPoll: 500, fetchMin: 1, sessionTimeout: 45, pollInterval: 5, speed: 'normal', onFail: 'dlq' },
+};
+const PKEYS = Object.keys(PRESETS.balanced).filter(k => k !== 'label' && k !== 'hint');
+const STORE = 'kafka-pilot-v2';
+
+let S = { more: [], goal: 'starter', topic: 'orders', host: 'kafka', group: 'orders-service', lang: 'java', keys: ['customer-42', 'customer-7'], hotKey: false };
+let importText = '', importReport = null, rk = 0;
+PKEYS.forEach(k => { S[k] = PRESETS.starter[k]; });
+try { const saved = JSON.parse(localStorage.getItem(STORE) || 'null'); if (saved) S = Object.assign(S, saved); } catch (e) {}
+const down = new Set();
+let step = Math.max(0, STEPS.findIndex(s => '#' + s.id === location.hash));
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const pl = (n, w, ws) => `${n} ${n === 1 ? w : (ws || w + 's')}`;
+/* Icons: Tabler Icons 3.49.0 (https://tabler.io/icons), used under the MIT License:
+
+MIT License
+
+Copyright (c) 2020-2026 Paweł Kuna
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+const TI = {
+  'target-arrow': '<path d="M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12 7a5 5 0 1 0 5 5"/><path d="M13 3.055a9 9 0 1 0 7.941 7.945"/><path d="M15 6v3h3l3 -3h-3v-3l-3 3"/><path d="M15 9l-3 3"/>',
+  'server-2': '<path d="M3 7a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-2"/><path d="M3 15a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3l0 -2"/><path d="M7 8l0 .01"/><path d="M7 16l0 .01"/><path d="M11 8h6"/><path d="M11 16h6"/>',
+  'app-window': '<path d="M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10"/><path d="M6 8h.01"/><path d="M9 8h.01"/>',
+  'inbox': '<path d="M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -12"/><path d="M4 13h3l3 3h4l3 -3h3"/>',
+  'file-code': '<path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2"/><path d="M10 13l-1 2l1 2"/><path d="M14 13l1 2l-1 2"/>',
+  'shield-check': '<path d="M11.46 20.846a12 12 0 0 1 -7.96 -14.846a12 12 0 0 0 8.5 -3a12 12 0 0 0 8.5 3a12 12 0 0 1 -.09 7.06"/><path d="M15 19l2 2l4 -4"/>',
+  'scale': '<path d="M7 20l10 0"/><path d="M6 6l6 -1l6 1"/><path d="M12 3l0 17"/><path d="M9 12l-3 -6l-3 6a3 3 0 0 0 6 0"/><path d="M21 12l-3 -6l-3 6a3 3 0 0 0 6 0"/>',
+  'stack-2': '<path d="M12 4l-8 4l8 4l8 -4l-8 -4"/><path d="M4 12l8 4l8 -4"/><path d="M4 16l8 4l8 -4"/>',
+  'bolt': '<path d="M13 3l0 7l6 0l-8 11l0 -7l-6 0l8 -11"/>',
+  'mail-forward': '<path d="M12 18h-7a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v7.5"/><path d="M3 6l9 6l9 -6"/><path d="M15 18h6"/><path d="M18 15l3 3l-3 3"/>',
+  'repeat': '<path d="M4 12v-3a3 3 0 0 1 3 -3h13m-3 -3l3 3l-3 3"/><path d="M20 12v3a3 3 0 0 1 -3 3h-13m3 3l-3 -3l3 -3"/>',
+  'alert-triangle': '<path d="M12 9v4"/><path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0"/><path d="M12 16h.01"/>',
+  'info-circle': '<path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 9h.01"/><path d="M11 12h1v4h1"/>',
+  'circle-check': '<path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M9 12l2 2l4 -4"/>',
+  'copy': '<path d="M7 9.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667l0 -8.666"/><path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"/>',
+  'check': '<path d="M5 12l5 5l10 -10"/>',
+  'player-pause': '<path d="M6 6a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -12"/><path d="M14 6a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -12"/>',
+  'player-play': '<path d="M7 4v16l13 -8l-13 -8"/>',
+  'arrow-left': '<path d="M5 12l14 0"/><path d="M5 12l6 6"/><path d="M5 12l6 -6"/>',
+  'arrow-right': '<path d="M5 12l14 0"/><path d="M13 18l6 -6"/><path d="M13 6l6 6"/>',
+  'refresh': '<path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/>',
+  'file-import': '<path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 13v-8a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-5.5m-9.5 -2h7m-3 -3l3 3l-3 3"/>',
+  'bug': '<path d="M9 9v-1a3 3 0 0 1 6 0v1"/><path d="M8 9h8a6 6 0 0 1 1 3v3a5 5 0 0 1 -10 0v-3a6 6 0 0 1 1 -3"/><path d="M3 13l4 0"/><path d="M17 13l4 0"/><path d="M12 20l0 -6"/><path d="M4 19l3.35 -2"/><path d="M20 19l-3.35 -2"/><path d="M4 7l3.75 2.4"/><path d="M20 7l-3.75 2.4"/>',
+  'plus': '<path d="M12 5l0 14"/><path d="M5 12l14 0"/>',
+  'minus': '<path d="M5 12l14 0"/>',
+  'x': '<path d="M18 6l-12 12"/><path d="M6 6l12 12"/>',
+  'lock': '<path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/>',
+  'server-off': '<path d="M12 12h-6a3 3 0 0 1 -3 -3v-2c0 -1.083 .574 -2.033 1.435 -2.56m3.565 -.44h10a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-2"/><path d="M16 12h2a3 3 0 0 1 3 3v2m-1.448 2.568a2.986 2.986 0 0 1 -1.552 .432h-12a3 3 0 0 1 -3 -3v-2a3 3 0 0 1 3 -3h6"/><path d="M7 8v.01"/><path d="M7 16v.01"/><path d="M3 3l18 18"/>',
+  'users-group': '<path d="M10 13a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M8 21v-1a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v1"/><path d="M15 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M17 10h2a2 2 0 0 1 2 2v1"/><path d="M5 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M3 13v-1a2 2 0 0 1 2 -2h2"/>',
+  'list-check': '<path d="M3.5 5.5l1.5 1.5l2.5 -2.5"/><path d="M3.5 11.5l1.5 1.5l2.5 -2.5"/><path d="M3.5 17.5l1.5 1.5l2.5 -2.5"/><path d="M11 6l9 0"/><path d="M11 12l9 0"/><path d="M11 18l9 0"/>',
+  'cpu': '<path d="M5 6a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1l0 -12"/><path d="M9 9h6v6h-6l0 -6"/><path d="M3 10h2"/><path d="M3 14h2"/><path d="M10 3v2"/><path d="M14 3v2"/><path d="M21 10h-2"/><path d="M21 14h-2"/><path d="M14 21v-2"/><path d="M10 21v-2"/>',
+  'database': '<path d="M4 6a8 3 0 1 0 16 0a8 3 0 1 0 -16 0"/><path d="M4 6v6a8 3 0 0 0 16 0v-6"/><path d="M4 12v6a8 3 0 0 0 16 0v-6"/>',
+  'history': '<path d="M12 8l0 4l2 2"/><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5"/>',
+  'sun': '<path d="M8 12a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7"/>',
+  'moon': '<path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454l0 .008"/>',
+  'device-desktop': '<path d="M3 5a1 1 0 0 1 1 -1h16a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1v-10"/><path d="M7 20h10"/><path d="M9 16v4"/><path d="M15 16v4"/>',
+  'route': '<path d="M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M19 7a2 2 0 1 0 0 -4a2 2 0 0 0 0 4"/><path d="M11 19h5.5a3.5 3.5 0 0 0 0 -7h-8a3.5 3.5 0 0 1 0 -7h4.5"/>',
+};
+const ic = (n, size = 16) => `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TI[n]}</svg>`;
+const list = a => a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Motion tokens: one rhythm for every response; everything is skipped for reduced motion or if GSAP is missing
+const M = { fast: .2, base: .38, slow: .55, ease: 'power3.out', pop: 'back.out(1.8)' };
+const motionOK = () => !reduce && !!window.gsap;
+let introTl = null, introDone = !motionOK(), prevSig = '';
+
+function normalize() {
+  S.producers = clamp(S.producers || 1, 1, 5);
+  if (!SPEED[S.speed]) S.speed = 'normal';
+  S.more = (Array.isArray(S.more) ? S.more : []).slice(0, 2).map(g => ({ name: String(g.name || '').slice(0, 60),
+    consumers: clamp(Number(g.consumers) || 1, 1, 8), speed: SPEED[g.speed] ? g.speed : 'normal' }));
+  S.brokers = clamp(S.brokers, 1, 5);
+  S.partitions = clamp(S.partitions, 1, 12);
+  S.rf = clamp(S.rf, 1, S.brokers);
+  S.minIsr = clamp(S.minIsr, 1, S.rf);
+  S.consumers = clamp(S.consumers, 1, 8);
+  S.linger = clamp(S.linger, 0, 100);
+  S.maxPoll = clamp(S.maxPoll, 10, 1000);
+  if (S.acks !== 'all' || S.retries === '0') S.idem = false;
+  S.requestTimeout = clamp(S.requestTimeout, 5, 120);
+  S.deliveryTimeout = clamp(S.deliveryTimeout, 10, 600);
+  // Kafka refuses to start a producer unless delivery.timeout.ms >= linger.ms + request.timeout.ms
+  const minD = Math.ceil((S.linger + S.requestTimeout * 1000) / 1000);
+  if (S.deliveryTimeout < minD) S.deliveryTimeout = Math.ceil(minD / 10) * 10;
+  S.sessionTimeout = clamp(S.sessionTimeout, 10, 120);
+  S.pollInterval = clamp(S.pollInterval, 1, 30);
+  S.retryBackoff = clamp(S.retryBackoff, 50, 2000);
+  S.maxBlock = clamp(S.maxBlock, 1, 120);
+  S.replicaLag = clamp(S.replicaLag, 5, 60);
+  if (!S.keys.length) S.hotKey = false;
+  for (const b of [...down]) if (b >= S.brokers) down.delete(b);
+}
+// How long a group's code takes per message. gap is how long one consumer stays busy in the animation.
+const SPEED = { fast: { ms: 10, gap: 150, label: 'About 10 ms', hint: 'Simple updates, in-memory work' },
+  normal: { ms: 100, gap: 340, label: 'About 100 ms', hint: 'A database write or an API call' },
+  slow: { ms: 1000, gap: 1300, label: 'About 1 second', hint: 'Image resizing, reports, slow services' } };
+// The main group comes from the consumer questions; up to two more groups read the same topic independently
+const groupList = () => [{ name: group(), consumers: S.consumers, speed: S.speed },
+  ...S.more.map(g => ({ name: g.name.trim() || 'other-service', consumers: g.consumers, speed: g.speed }))];
+const fmtS = ms => ms < 1000 ? `${Math.round(ms)} ms` : ms < 120000 ? `${+(ms / 1000).toFixed(1)} s` : `${+(ms / 60000).toFixed(1)} min`;
+const msgBytes = () => S.maxMsgMB * 1048576;
+// Worst case: the broker never answers, so every attempt runs the full request timeout.
+function retryPlan() {
+  const D = S.deliveryTimeout * 1000, R = S.requestTimeout * 1000;
+  const limit = S.retries === 'max' ? Infinity : Number(S.retries);
+  const cap = Math.max(1000, S.retryBackoff), seg = [];
+  let t = 0, n = 0;
+  if (S.linger) { seg.push({ k: 'linger', a: 0, b: S.linger }); t = S.linger; }
+  while (t < D) {
+    const e = Math.min(D, t + R);
+    seg.push({ k: 'try', a: t, b: e, n: ++n }); t = e;
+    if (t >= D || n > limit) break;
+    const bo = Math.min(cap, S.retryBackoff * 2 ** (n - 1));
+    seg.push({ k: 'wait', a: t, b: Math.min(D, t + bo) }); t += bo;
+  }
+  return { seg, tries: n, end: Math.min(t, D), D };
+}
+function save() { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) {} }
+const isCustom = () => PKEYS.some(k => S[k] !== PRESETS[S.goal][k]);
+const hostList = port => Array.from({ length: S.brokers }, (_, i) => `${hostPrefix()}${i + 1}:${port}`);
+const validTopic = t => /^[a-zA-Z0-9._-]{1,249}$/.test(t) && t !== '.' && t !== '..';
+const validHost = h => /^[a-zA-Z][a-zA-Z0-9-]{0,40}$/.test(h);
+const topic = () => validTopic(S.topic.trim()) ? S.topic.trim() : 'orders';
+const group = () => S.group.trim() || 'orders-service';
+function hostPrefix() { return validHost(S.host.trim()) ? S.host.trim() : 'kafka'; }
+// Text fields are checked once the person leaves them, then live while they fix the value
+const touched = new Set();
+function fieldError(k) {
+  if (!touched.has(k)) return '';
+  const v = String(S[k]).trim();
+  if (k === 'topic' && !validTopic(v)) return v ? 'Topic names can only use letters, digits, dots, dashes and underscores. The files use “orders” until this is fixed.' : 'Enter a topic name. The files use “orders” until you do.';
+  if (k === 'host' && !validHost(v)) return 'Use letters, digits and dashes, starting with a letter. The files use “kafka” until this is fixed.';
+  if (k === 'group' && !v) return 'Enter a group name. The files use “orders-service” until you do.';
+  return '';
+}
+function updateFieldErrors() {
+  for (const k of ['topic', 'host', 'group']) {
+    const inp = $(k), err = $(k + '-err'); if (!inp || !err) continue;
+    const msg = fieldError(k);
+    err.textContent = msg; err.hidden = !msg;
+    msg ? inp.setAttribute('aria-invalid', 'true') : inp.removeAttribute('aria-invalid');
+  }
+}
+let keyMsg = '', savedText = null;
+function announce(msg) { const a = $('announce'); if (a) { a.textContent = ''; setTimeout(() => { a.textContent = msg; }, 50); } }
+
+/* ---------- Kafka model ---------- */
+// Kafka's default partitioner: murmur2 of the key's UTF-8 bytes, made positive, modulo partition count
+function murmur2(str) {
+  const d = new TextEncoder().encode(str), len = d.length, m = 0x5bd1e995;
+  let h = 0x9747b28c ^ len;
+  for (let i = 0; i < len >> 2; i++) {
+    const j = i * 4;
+    let k = d[j] | (d[j + 1] << 8) | (d[j + 2] << 16) | (d[j + 3] << 24);
+    k = Math.imul(k, m); k ^= k >>> 24; k = Math.imul(k, m);
+    h = Math.imul(h, m); h ^= k;
+  }
+  const t = len & ~3;
+  switch (len % 4) {
+    case 3: h ^= d[t + 2] << 16;
+    case 2: h ^= d[t + 1] << 8;
+    case 1: h ^= d[t]; h = Math.imul(h, m);
+  }
+  h ^= h >>> 13; h = Math.imul(h, m); h ^= h >>> 15;
+  return h | 0;
+}
+const partitionFor = key => (murmur2(key) & 0x7fffffff) % S.partitions;
+function parts() {
+  const out = [];
+  for (let p = 0; p < S.partitions; p++) {
+    const reps = [];
+    for (let k = 0; k < S.rf; k++) reps.push((p + k) % S.brokers);
+    const alive = reps.filter(b => !down.has(b));
+    const leader = alive.length ? alive[0] : null;
+    const writable = leader !== null && (S.acks !== 'all' || alive.length >= S.minIsr);
+    out.push({ p, reps, alive, leader, writable, moved: leader !== null && leader !== reps[0] });
+  }
+  return out;
+}
+
+function checks() {
+  const w = [];
+  if (S.rf === 1) w.push({ step: 1, lvl: 'warn', text: 'Each message is stored on one broker only. If that broker fails, its messages are gone. Use 3 copies for anything important.' });
+  if (S.rf > 1 && S.minIsr === S.rf && S.acks === 'all') w.push({ step: 1, lvl: 'warn', text: `Writes stop as soon as any one broker is down, because all ${S.rf} copies must confirm. Set “copies that must confirm” to ${S.rf - 1}.` });
+  if (S.brokers < 3) w.push({ step: 1, lvl: 'info', text: `With ${pl(S.brokers, 'broker')} you can keep at most ${pl(S.brokers, 'copy', 'copies')}. Production clusters usually start at 3.` });
+  if (S.acks !== 'all' && S.minIsr > 1) w.push({ step: 2, lvl: 'info', text: `“Copies that must confirm” (min.insync.replicas=${S.minIsr}) only applies with acks=all, so it has no effect with acks=${S.acks}.` });
+  if (S.acks === '0') w.push({ step: 2, lvl: 'warn', text: 'The producer never hears back, so it cannot retry. Messages are lost without any error when a broker is busy or down.' });
+  if (S.acks === '1') w.push({ step: 2, lvl: 'info', text: 'If the leader crashes after confirming but before the followers copy the message, that message is lost.' });
+  if (S.maxMsgMB > 1) w.push({ step: 1, lvl: 'info', text: 'Large messages slow down replication and use more memory. For big files, store them elsewhere and send a link.' });
+  if (S.acks !== '0' && S.retries === '0') w.push({ step: 2, lvl: 'warn', text: 'One failed attempt loses the message. Short network blips and leader changes are normal, so let the producer retry.' });
+  if (S.acks !== '0' && S.retries !== '0' && !S.idem && S.maxInFlight > 1) w.push({ step: 2, lvl: 'warn', text: 'A retried batch can land after a newer one, so messages can arrive out of order. Turn on duplicate prevention or allow one request at a time.' });
+  if (S.acks === '0' && S.retries !== '0') w.push({ step: 2, lvl: 'info', text: 'Retry settings have no effect with acks=0: the producer never learns that a send failed.' });
+  for (const gr of groupList()) {
+    const need = SPEED[gr.speed].ms * S.maxPoll;
+    if (need > S.pollInterval * 60000) w.push({ step: 3, lvl: 'warn', text: `“${esc(gr.name)}” needs about ${fmtS(need)} to handle ${S.maxPoll} messages (${SPEED[gr.speed].label.toLowerCase()} each), longer than the ${pl(S.pollInterval, 'minute')} limit. Kafka will think its consumers are stuck. Lower messages per poll or raise the time limit.` });
+  }
+  S.more.forEach(g => { if (g.consumers > S.partitions) w.push({ step: 3, lvl: 'warn', text: `In “${esc(g.name)}”, ${pl(g.consumers - S.partitions, 'consumer')} will sit idle: there are only ${pl(S.partitions, 'partition')}.` }); });
+  if (S.onFail === 'retry') w.push({ step: 3, lvl: 'info', text: 'A message that always fails, like one with bad data, blocks its partition until someone fixes it.' });
+  if (S.consumers > S.partitions) w.push({ step: 3, lvl: 'warn', text: `${pl(S.consumers - S.partitions, 'consumer')} will sit idle. Each partition is read by only one consumer in a group, so ${S.partitions} is the most that can work at once.` });
+  if (S.autoCommit) w.push({ step: 3, lvl: 'info', text: 'Messages are marked as read every 5 seconds, whether your code finished them or not. After a crash some messages can be skipped or handled twice.' });
+  if (S.reset === 'latest') w.push({ step: 3, lvl: 'info', text: 'A new group starts at the end of the topic. Messages sent before it first connects are never read by that group.' });
+  return w;
+}
+
+/* ---------- Generated files ---------- */
+function producerFile() {
+  const L = [`# producer.properties for topic "${topic()}"`,
+    '# Brokers to contact first. The client finds the rest of the cluster from them.',
+    `bootstrap.servers=${hostList(9092).join(',')}`,
+    'key.serializer=org.apache.kafka.common.serialization.StringSerializer',
+    'value.serializer=org.apache.kafka.common.serialization.StringSerializer', '',
+    { '0': '# Do not wait for any confirmation (fastest, can lose messages)',
+      '1': '# Wait for the partition leader to save the message',
+      'all': '# Wait until every in-sync copy has saved the message' }[S.acks],
+    `acks=${S.acks}`,
+    S.idem ? '# Retries never create duplicate messages' : '# Retries may create duplicates (preventing them needs acks=all and retries)',
+    `enable.idempotence=${S.idem}`, '',
+    S.linger ? `# Wait up to ${S.linger} ms to fill a batch before sending` : '# Send right away, without waiting to fill a batch',
+    `linger.ms=${S.linger}`,
+    `# Largest batch per partition: ${S.batch} KB`,
+    `batch.size=${S.batch * 1024}`,
+    S.compression === 'none' ? '# Send batches uncompressed' : `# Compress each batch with ${S.compression}`,
+    `compression.type=${S.compression}`,
+    `# Largest request, must match message.max.bytes on the brokers (${S.maxMsgMB} MB)`,
+    `max.request.size=${msgBytes()}`, '',
+    '# --- When a send fails ---',
+    S.acks === '0' ? '# (Retries have no effect with acks=0: the producer never hears about failures)'
+      : { max: '# Retry as often as needed until delivery.timeout.ms runs out', '3': '# Retry at most 3 times', '0': '# Never retry: one failed attempt loses the message' }[S.retries],
+    `retries=${S.retries === 'max' ? 2147483647 : S.retries}`,
+    `# Give up on a message ${fmtS(S.deliveryTimeout * 1000)} after send(), counting batching and every retry`,
+    `delivery.timeout.ms=${S.deliveryTimeout * 1000}`,
+    `# Wait up to ${S.requestTimeout} s for a broker to answer each attempt`,
+    `request.timeout.ms=${S.requestTimeout * 1000}`,
+    `# Pause ${S.retryBackoff} ms before the first retry, doubling each time up to ${fmtS(Math.max(1000, S.retryBackoff))}`,
+    `retry.backoff.ms=${S.retryBackoff}`,
+    '# (retry.backoff.max.ms needs Kafka clients 3.7 or newer)',
+    `retry.backoff.max.ms=${Math.max(1000, S.retryBackoff)}`,
+    S.maxInFlight === 1 ? '# One request at a time per broker: order is always kept' : (S.idem ? '# Up to 5 requests at once per broker; idempotence keeps them in order' : '# Up to 5 requests at once per broker; a retry can reorder messages'),
+    `max.in.flight.requests.per.connection=${S.maxInFlight}`,
+    `# send() blocks at most ${S.maxBlock} s when the buffer is full or no broker is reachable, then throws`,
+    `max.block.ms=${S.maxBlock * 1000}`];
+  return L.join('\n');
+}
+function consumerFile() {
+  const L = [`# consumer.properties for group "${group()}"`,
+    `bootstrap.servers=${hostList(9092).join(',')}`,
+    '# Consumers with the same group.id share the partitions between them',
+    `group.id=${group()}`,
+    'key.deserializer=org.apache.kafka.common.serialization.StringDeserializer',
+    'value.deserializer=org.apache.kafka.common.serialization.StringDeserializer', '',
+    S.reset === 'earliest' ? '# A new group reads everything still stored' : '# A new group only reads messages sent after it starts',
+    `auto.offset.reset=${S.reset}`,
+    S.autoCommit ? '# Mark messages as read automatically every 5 seconds' : '# Your code calls commitSync() after it finishes processing',
+    `enable.auto.commit=${S.autoCommit}`];
+  if (S.autoCommit) L.push('auto.commit.interval.ms=5000');
+  L.push('', `# Hand your code up to ${S.maxPoll} messages per poll()`, `max.poll.records=${S.maxPoll}`,
+    S.fetchMin === 1 ? '# Return data as soon as any is available' : '# Wait for 64 KB of data, or 0.5 s, whichever comes first',
+    `fetch.min.bytes=${S.fetchMin}`,
+    'fetch.max.wait.ms=500',
+    `# Largest message this consumer can read (${S.maxMsgMB} MB, same as the brokers)`,
+    `max.partition.fetch.bytes=${msgBytes()}`,
+    `fetch.max.bytes=${Math.max(52428800, msgBytes())}`, '',
+    '# --- When a consumer is slow or crashes ---',
+    `# A consumer silent for ${S.sessionTimeout} s is treated as dead and its partitions move`,
+    `session.timeout.ms=${S.sessionTimeout * 1000}`,
+    '# Send a heartbeat every third of the session timeout',
+    `heartbeat.interval.ms=${Math.floor(S.sessionTimeout * 1000 / 3)}`,
+    `# Must call poll() again within ${S.pollInterval} min, or Kafka treats this consumer as stuck`,
+    `max.poll.interval.ms=${S.pollInterval * 60000}`);
+  if (S.onFail === 'dlq') L.push(`# Messages your code cannot handle go to the "${topic()}.dlq" topic (see ConsumerLoop.java)`);
+  if (S.more.length) L.push('', `# Other groups reading "${topic()}": ${list(S.more.map(g => `${g.name.trim() || 'other-service'} (${pl(g.consumers, 'consumer')})`))}.`,
+    '# Each uses this same file with its own group.id and gets every message.');
+  return L.join('\n');
+}
+function loopFile() {
+  const t = topic(), L = [
+    '// ConsumerLoop.java: the read, handle, commit loop that matches consumer.properties',
+    '// imports: java.io.*, java.time.Duration, java.util.*, org.apache.kafka.clients.consumer.*,',
+    '//          org.apache.kafka.clients.producer.*, org.apache.kafka.common.TopicPartition',
+    'Properties props = new Properties();',
+    'props.load(new FileInputStream("consumer.properties"));',
+    'KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props);'];
+  if (S.onFail === 'dlq') L.push('', '// A producer for failed messages, using producer.properties',
+    'Properties pp = new Properties();',
+    'pp.load(new FileInputStream("producer.properties"));',
+    'KafkaProducer<String, String> dlq = new KafkaProducer<>(pp);');
+  L.push('', `consumer.subscribe(List.of("${t}"));`,
+    'while (running) {',
+    '  ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(500));',
+    '  for (TopicPartition tp : records.partitions()) {',
+    '    for (ConsumerRecord<String, String> r : records.records(tp)) {',
+    '      try {',
+    '        handle(r);  // your code',
+    '      } catch (Exception e) {');
+  if (S.onFail === 'dlq') L.push(
+    '        // Park the message and move on; .get() waits until it is safely stored',
+    `        dlq.send(new ProducerRecord<>("${t}.dlq", r.key(), r.value())).get();`);
+  else L.push(
+    '        // Read this message again on the next poll and skip the rest of this partition',
+    '        consumer.seek(tp, r.offset());',
+    '        Thread.sleep(1000);',
+    '        break;');
+  L.push('      }', '    }', '  }');
+  L.push(S.autoCommit ? '  // enable.auto.commit=true: Kafka marks messages as read in the background'
+    : '  consumer.commitSync();  // mark everything handled so far as read');
+  L.push('}');
+  return L.join('\n');
+}
+function serverFile() {
+  const B = S.brokers, ctrl = B % 2 ? B : B - 1, h = hostPrefix();
+  const voters = Array.from({ length: ctrl }, (_, i) => `${i + 1}@${h}${i + 1}:9093`).join(',');
+  const L = ['# server.properties (KRaft mode, no ZooKeeper)',
+    `# Copy to all ${pl(B, 'broker')}. On broker N set node.id=N and its own host name.`];
+  if (ctrl < B) L.push(`# Brokers 1-${ctrl} also act as controllers (an odd number is needed).`, `# On broker ${B} use process.roles=broker and drop the CONTROLLER listener.`);
+  L.push('process.roles=broker,controller', 'node.id=1', `controller.quorum.voters=${voters}`,
+    'listeners=PLAINTEXT://:9092,CONTROLLER://:9093',
+    `advertised.listeners=PLAINTEXT://${h}1:9092`,
+    'controller.listener.names=CONTROLLER',
+    'inter.broker.listener.name=PLAINTEXT',
+    'listener.security.protocol.map=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT',
+    'log.dirs=/var/lib/kafka/data', '',
+    '# Defaults for new topics',
+    `num.partitions=${S.partitions}`,
+    `default.replication.factor=${S.rf}`,
+    `min.insync.replicas=${S.minIsr}`,
+    `# Keep messages for ${pl(S.retention, 'day')}`,
+    `log.retention.hours=${S.retention * 24}`,
+    '# Create topics on purpose, never by a typo in client code',
+    'auto.create.topics.enable=false',
+    '# Never promote an out-of-date copy to leader (it would drop messages)',
+    'unclean.leader.election.enable=false',
+    `# A follower more than ${S.replicaLag} s behind stops counting as an in-sync copy`,
+    `replica.lag.time.max.ms=${S.replicaLag * 1000}`,
+    `# Largest message: ${S.maxMsgMB} MB (producer max.request.size must match)`,
+    `message.max.bytes=${msgBytes()}`,
+    `replica.fetch.max.bytes=${msgBytes()}`, '',
+    "# Give Kafka's own internal topics the same safety",
+    `offsets.topic.replication.factor=${S.rf}`,
+    `transaction.state.log.replication.factor=${S.rf}`,
+    `transaction.state.log.min.isr=${S.minIsr}`);
+  return L.join('\n');
+}
+function setupFile() {
+  const bs = hostList(9092)[0];
+  return ['# 1. Run once: create one cluster ID and reuse it on every broker',
+    'KAFKA_CLUSTER_ID=$(bin/kafka-storage.sh random-uuid)',
+    '',
+    '# 2. On every broker: format storage, then start it',
+    'bin/kafka-storage.sh format -t $KAFKA_CLUSTER_ID -c config/server.properties',
+    'bin/kafka-server-start.sh config/server.properties',
+    '',
+    `# 3. Create the "${topic()}" topic`,
+    `bin/kafka-topics.sh --bootstrap-server ${bs} --create --topic ${topic()} \\`,
+    `  --partitions ${S.partitions} --replication-factor ${S.rf} \\`,
+    `  --config min.insync.replicas=${S.minIsr} --config retention.ms=${S.retention * 86400000}`,
+    ...(S.onFail === 'dlq' ? ['', `# 3b. Dead-letter topic for messages your code could not handle (kept 30 days)`,
+      `bin/kafka-topics.sh --bootstrap-server ${bs} --create --topic ${topic()}.dlq \\`,
+      `  --partitions 1 --replication-factor ${S.rf} --config retention.ms=2592000000`] : []),
+    '',
+    '# 4. Check which brokers hold each partition',
+    `bin/kafka-topics.sh --bootstrap-server ${bs} --describe --topic ${topic()}`,
+    '',
+    '# 5. Send and read a test message',
+    `bin/kafka-console-producer.sh --bootstrap-server ${bs} --topic ${topic()} --producer.config producer.properties`,
+    `bin/kafka-console-consumer.sh --bootstrap-server ${bs} --topic ${topic()} --consumer.config consumer.properties`].join('\n');
+}
+/* librdkafka clients (Python, Node.js, Go) share almost all of Java's names */
+function rdProducer() {
+  const e = [['bootstrap.servers', hostList(9092).join(',')], ['acks', S.acks], ['enable.idempotence', S.idem],
+    ['linger.ms', S.linger], ['batch.size', S.batch * 1024], ['compression.type', S.compression],
+    ['message.max.bytes', msgBytes(), "librdkafka's name for max.request.size"]];
+  if (S.acks !== '0') e.push(['retries', S.retries === 'max' ? 2147483647 : Number(S.retries)],
+    ['delivery.timeout.ms', S.deliveryTimeout * 1000], ['request.timeout.ms', S.requestTimeout * 1000],
+    ['retry.backoff.ms', S.retryBackoff], ['retry.backoff.max.ms', Math.max(1000, S.retryBackoff)]);
+  e.push(['max.in.flight.requests.per.connection', S.maxInFlight]);
+  return e;
+}
+function rdConsumer(storeOffsets) {
+  const e = [['bootstrap.servers', hostList(9092).join(',')], ['group.id', group()], ['auto.offset.reset', S.reset],
+    ['enable.auto.commit', S.autoCommit]];
+  if (storeOffsets) e.push(['enable.auto.offset.store', false, 'mark a message done only after handling it']);
+  e.push(['fetch.min.bytes', S.fetchMin], ['fetch.wait.max.ms', 500, 'Java name: fetch.max.wait.ms'],
+    ['max.partition.fetch.bytes', msgBytes()], ['fetch.max.bytes', Math.max(52428800, msgBytes())],
+    ['session.timeout.ms', S.sessionTimeout * 1000], ['heartbeat.interval.ms', Math.floor(S.sessionTimeout * 1000 / 3)],
+    ['max.poll.interval.ms', S.pollInterval * 60000]);
+  return e;
+}
+const dictLines = (entries, q, ind, cmt, bools) => entries.map(([k, v, note]) =>
+  `${ind}${q}${k}${q}: ${typeof v === 'string' ? q + v + q : typeof v === 'boolean' ? bools[+v] : v},${note ? `  ${cmt} ${note}` : ''}`);
+function pythonFile() {
+  const t = topic(), retry = S.onFail === 'retry', d = e => dictLines(e, '"', '    ', '#', ['False', 'True']);
+  const L = ['# kafka_client.py: confluent-kafka for Python (pip install confluent-kafka)',
+    "# It uses librdkafka, whose setting names are almost the same as Java's.",
+    'from confluent_kafka import Consumer, Producer, TopicPartition', '',
+    'producer = Producer({', ...d(rdProducer()), '})',
+    "# produce() raises BufferError at once when its queue is full (Java's max.block.ms",
+    '# has no equivalent here): call producer.poll(1) and try again.', '',
+    'def on_delivery(err, msg):',
+    '    if err:  # called after delivery.timeout.ms when every retry failed',
+    '        print(f"Delivery failed: {err}")', '',
+    `producer.produce("${t}", key="${S.keys[0] || 'customer-42'}", value="...", on_delivery=on_delivery)`,
+    'producer.flush()', '',
+    'consumer = Consumer({', ...d(rdConsumer(true)), '})',
+    `consumer.subscribe(["${t}"])`, '',
+    'while True:',
+    `    batch = consumer.consume(num_messages=${S.maxPoll}, timeout=0.5)  # Java: max.poll.records`,
+    '    handled = 0'];
+  if (retry) L.push('    failed = set()');
+  L.push('    for m in batch:', '        if m.error():', '            continue');
+  if (retry) L.push('        if (m.topic(), m.partition()) in failed:', '            continue  # the failed message must succeed first');
+  L.push('        try:', '            handle(m)  # your code', '        except Exception:');
+  if (retry) L.push('            # Read this message again on the next consume() call',
+    '            consumer.seek(TopicPartition(m.topic(), m.partition(), m.offset()))',
+    '            failed.add((m.topic(), m.partition()))', '            continue');
+  else L.push(`            producer.produce("${t}.dlq", key=m.key(), value=m.value())`, '            producer.flush()');
+  L.push('        consumer.store_offsets(message=m)', '        handled += 1');
+  L.push(...(S.autoCommit ? ['    # enable.auto.commit is on: stored offsets are committed in the background']
+    : ['    if handled:', '        consumer.commit(asynchronous=False)  # mark stored messages as read']));
+  return L.join('\n');
+}
+function nodeFile() {
+  const t = topic(), d = e => dictLines(e, "'", '  ', '//', ['false', 'true']);
+  return ['// kafka-client.js: Confluent JavaScript client (npm install @confluentinc/kafka-javascript)',
+    "// It uses librdkafka, whose setting names are almost the same as Java's.",
+    "const { Kafka } = require('@confluentinc/kafka-javascript').KafkaJS;", '',
+    'const kafka = new Kafka({});',
+    'const producer = kafka.producer({', ...d(rdProducer()), '});', '',
+    'const consumer = kafka.consumer({', ...d(rdConsumer(false)), '});', '',
+    'async function main() {',
+    '  await producer.connect();',
+    `  await producer.send({ topic: '${t}', messages: [{ key: '${S.keys[0] || 'customer-42'}', value: '...' }] });`,
+    '  await consumer.connect();',
+    `  await consumer.subscribe({ topics: ['${t}'] });`,
+    '  await consumer.run({',
+    '    eachMessage: async ({ message }) => {',
+    S.onFail === 'dlq' ? `      try { await handle(message); }  // your code
+      catch (e) { await producer.send({ topic: '${t}.dlq', messages: [message] }); }` : '      await handle(message);  // your code',
+    '    },', '  });', '}', 'main();'].join('\n');
+}
+function goFile() {
+  const d = e => dictLines(e, '"', '\t\t', '//', ['false', 'true']);
+  return ['// kafka_client.go: confluent-kafka-go',
+    '// go get github.com/confluentinc/confluent-kafka-go/v2/kafka',
+    'package main', '', 'import "github.com/confluentinc/confluent-kafka-go/v2/kafka"', '',
+    'func newProducer() (*kafka.Producer, error) {', '\treturn kafka.NewProducer(&kafka.ConfigMap{', ...d(rdProducer()), '\t})', '}', '',
+    'func newConsumer() (*kafka.Consumer, error) {', '\treturn kafka.NewConsumer(&kafka.ConfigMap{', ...d(rdConsumer(true)), '\t})', '}', '',
+    '// Read loop: msg, err := c.ReadMessage(500 * time.Millisecond)',
+    `// After handle(msg) succeeds, call c.StoreMessage(msg)${S.autoCommit ? '; auto commit saves it in the background.' : ', then c.Commit() to mark it read.'}`,
+    S.onFail === 'dlq' ? `// If it fails, produce it to "${topic()}.dlq" and store it anyway.` : '// If it fails, c.Seek() back to msg.TopicPartition and try again.'].join('\n');
+}
+function springFile() {
+  const t = topic(), L = ['# application.yml for Spring Boot (spring-kafka)',
+    'spring:', '  kafka:', `    bootstrap-servers: ${hostList(9092).join(',')}`,
+    '    producer:', `      acks: ${S.acks}`];
+  if (S.acks !== '0') L.push(`      retries: ${S.retries === 'max' ? 2147483647 : S.retries}`);
+  L.push(`      batch-size: ${S.batch}KB`, `      compression-type: ${S.compression}`,
+    '      key-serializer: org.apache.kafka.common.serialization.StringSerializer',
+    '      value-serializer: org.apache.kafka.common.serialization.StringSerializer',
+    '      properties:', `        enable.idempotence: ${S.idem}`, `        linger.ms: ${S.linger}`,
+    `        max.request.size: ${msgBytes()}`);
+  if (S.acks !== '0') L.push(`        delivery.timeout.ms: ${S.deliveryTimeout * 1000}`, `        request.timeout.ms: ${S.requestTimeout * 1000}`,
+    `        retry.backoff.ms: ${S.retryBackoff}`, `        retry.backoff.max.ms: ${Math.max(1000, S.retryBackoff)}`);
+  L.push(`        max.in.flight.requests.per.connection: ${S.maxInFlight}`, `        max.block.ms: ${S.maxBlock * 1000}`,
+    '    consumer:', `      group-id: ${group()}`, `      auto-offset-reset: ${S.reset}`, `      enable-auto-commit: ${S.autoCommit}`,
+    `      max-poll-records: ${S.maxPoll}`, `      fetch-min-size: ${S.fetchMin === 1 ? '1B' : '64KB'}`, '      fetch-max-wait: 500ms',
+    '      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer',
+    '      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer',
+    '      properties:', `        max.partition.fetch.bytes: ${msgBytes()}`, `        fetch.max.bytes: ${Math.max(52428800, msgBytes())}`,
+    `        session.timeout.ms: ${S.sessionTimeout * 1000}`, `        heartbeat.interval.ms: ${Math.floor(S.sessionTimeout * 1000 / 3)}`,
+    `        max.poll.interval.ms: ${S.pollInterval * 60000}`);
+  if (!S.autoCommit) L.push('    listener:', '      # Commit after your @KafkaListener has handled each poll\'s messages', '      ack-mode: batch');
+  L.push('', '# Failed messages: add this bean to a @Configuration class.',
+    '# @Bean', '# DefaultErrorHandler errorHandler(KafkaTemplate<Object, Object> template) {');
+  if (S.onFail === 'dlq') L.push('#   return new DefaultErrorHandler(', '#     new DeadLetterPublishingRecoverer(template,',
+    `#       (record, ex) -> new TopicPartition("${t}.dlq", -1)),`, '#     new FixedBackOff(1000L, 2L));  // 2 quick retries, then the dead-letter topic');
+  else L.push('#   return new DefaultErrorHandler(new FixedBackOff(1000L, FixedBackOff.UNLIMITED_ATTEMPTS));');
+  L.push('# }');
+  return L.join('\n');
+}
+function composeFile() {
+  const B = S.brokers, ctrl = B % 2 ? B : B - 1;
+  const voters = Array.from({ length: ctrl }, (_, i) => `${i + 1}@kafka${i + 1}:9093`).join(',');
+  const L = ['# docker-compose.yml: run this cluster on your machine with "docker compose up -d"',
+    `# Apps on your machine connect to ${Array.from({ length: B }, (_, i) => `localhost:${29091 + i}`).join(',')}`,
+    '# Apps inside this compose network use kafka1:9092, kafka2:9092 and so on', 'services:'];
+  for (let id = 1; id <= B; id++) {
+    const isCtrl = id <= ctrl, port = 29090 + id;
+    L.push(`  kafka${id}:`, '    image: apache/kafka:3.9.0', `    hostname: kafka${id}`, `    ports: ["${port}:${port}"]`, '    environment:',
+      '      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk',
+      `      KAFKA_NODE_ID: ${id}`,
+      `      KAFKA_PROCESS_ROLES: ${isCtrl ? 'broker,controller' : 'broker'}`,
+      `      KAFKA_CONTROLLER_QUORUM_VOTERS: ${voters}`,
+      `      KAFKA_LISTENERS: PLAINTEXT://:9092,${isCtrl ? 'CONTROLLER://:9093,' : ''}EXTERNAL://:${port}`,
+      `      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka${id}:9092,EXTERNAL://localhost:${port}`,
+      '      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT',
+      '      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER',
+      '      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT',
+      `      KAFKA_NUM_PARTITIONS: ${S.partitions}`,
+      `      KAFKA_DEFAULT_REPLICATION_FACTOR: ${S.rf}`,
+      `      KAFKA_MIN_INSYNC_REPLICAS: ${S.minIsr}`,
+      `      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${S.rf}`,
+      `      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: ${S.rf}`,
+      `      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: ${S.minIsr}`,
+      `      KAFKA_LOG_RETENTION_HOURS: ${S.retention * 24}`,
+      `      KAFKA_MESSAGE_MAX_BYTES: ${msgBytes()}`,
+      `      KAFKA_REPLICA_FETCH_MAX_BYTES: ${msgBytes()}`,
+      `      KAFKA_REPLICA_LAG_TIME_MAX_MS: ${S.replicaLag * 1000}`,
+      '      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"',
+      '      KAFKA_UNCLEAN_LEADER_ELECTION_ENABLE: "false"');
+  }
+  L.push('', '# When the brokers are up, create the topic:',
+    `# docker compose exec kafka1 /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka1:9092 --create --topic ${topic()} --partitions ${S.partitions} --replication-factor ${S.rf} --config min.insync.replicas=${S.minIsr}`);
+  return L.join('\n');
+}
+const FILES = {
+  'producer.properties': { r: 'producer', make: producerFile, where: 'In your app that sends', mode: 'props' },
+  'consumer.properties': { r: 'consumer', make: consumerFile, where: 'In each service that reads', mode: 'props' },
+  'ConsumerLoop.java': { r: 'consumer', make: loopFile, where: 'Read, handle, commit', mode: 'code' },
+  'application.yml': { r: 'producer', make: springFile, where: 'Spring Boot, both sides', mode: 'yaml' },
+  'kafka_client.py': { r: 'producer', make: pythonFile, where: 'Python, both sides', mode: 'code' },
+  'kafka-client.js': { r: 'producer', make: nodeFile, where: 'Node.js, both sides', mode: 'code' },
+  'kafka_client.go': { r: 'producer', make: goFile, where: 'Go, both sides', mode: 'code' },
+  'docker-compose.yml': { r: 'broker', make: composeFile, where: 'Run this cluster locally', mode: 'yaml' },
+  'server.properties': { r: 'broker', make: serverFile, where: 'On each broker', mode: 'props' },
+  'setup.sh': { r: 'broker', make: setupFile, where: 'Commands to run, in order', mode: 'props' },
+};
+const LANGS = { java: ['producer.properties', 'consumer.properties', 'ConsumerLoop.java'], spring: ['application.yml'],
+  python: ['kafka_client.py'], node: ['kafka-client.js'], go: ['kafka_client.go'] };
+function highlight(txt, mode) {
+  return txt.split('\n').map(line => {
+    const t = line.trimStart();
+    if (t.startsWith('#') || t.startsWith('//')) return `<span class="c">${esc(line)}</span>`;
+    let m;
+    if (mode === 'props' && (m = /^([a-z][a-z0-9._]*)=(.*)$/.exec(line))) return `<span class="k">${esc(m[1])}</span>=${esc(m[2])}`;
+    if (mode === 'yaml' && (m = /^(\s*)([A-Za-z_][\w.\-]*):(.*)$/.exec(line))) return `${esc(m[1])}<span class="k">${esc(m[2])}</span>:${esc(m[3])}`;
+    if (mode === 'code' && (m = /^(\s*)(["'][a-z][\w.]*["'])(:\s.*)$/.exec(line))) return `${esc(m[1])}<span class="k">${esc(m[2])}</span>${esc(m[3])}`;
+    return esc(line);
+  }).join('\n');
+}
+const preId = name => 'pre-' + name.replace(/[^a-z0-9]/gi, '-');
+function fileBlock(name) {
+  const f = FILES[name];
+  return `<div class="file" data-r="${f.r}"><div class="file-head"><div class="fname">${ic('file-code')}<b>${name}</b> <span>${f.where}</span></div>
+    <button type="button" class="link-btn" data-copy="${name}">${ic('copy')}<span>Copy</span></button></div><pre tabindex="0" id="${preId(name)}">${highlight(f.make(), f.mode)}</pre></div>`;
+}
+
+/* ---------- Import an existing config ---------- */
+const EXAMPLE = `# A producer and consumer config with several common mistakes
+bootstrap.servers=broker1:9092,broker2:9092,broker3:9092
+acks=1
+enable.idempotence=true
+linger.ms=20
+request.timeout.ms=30000
+delivery.timeout.ms=20000
+max.in.flight.requests.per.connection=10
+batch.size=32768
+group.id=billing
+enable.auto.commit=true
+session.timeout.ms=10000
+heartbeat.interval.ms=12000
+min.insync.replicas=3
+default.replication.factor=2
+ssl.endpoint.identification.algorithm=https`;
+const num = v => v === undefined ? NaN : Number(String(v).replace(/_/g, '').trim());
+const size = v => { const m = /^(\d+(?:\.\d+)?)\s*(B|KB|MB|GB)?$/i.exec(String(v ?? '').trim()); return m ? Number(m[1]) * { B: 1, KB: 1024, MB: 1048576, GB: 1073741824 }[(m[2] || 'B').toUpperCase()] : NaN; };
+const bool = v => /^true$/i.test(String(v ?? '').trim()) ? true : /^false$/i.test(String(v ?? '').trim()) ? false : undefined;
+const oneOf = (...a) => v => a.includes(String(v).toLowerCase()) ? String(v).toLowerCase() : undefined;
+const IMPORT = {
+  'acks': ['acks', v => v === '-1' ? 'all' : oneOf('0', '1', 'all')(v)],
+  'enable.idempotence': ['idem', bool],
+  'linger.ms': ['linger', num],
+  'batch.size': ['batch', v => size(v) / 1024, [16, 64, 256]],
+  'compression.type': ['compression', oneOf('none', 'lz4', 'zstd', 'snappy', 'gzip')],
+  'retries': ['retries', v => { const n = num(v); return isNaN(n) ? undefined : n === 0 ? '0' : n >= 1000 ? 'max' : '3'; }],
+  'delivery.timeout.ms': ['deliveryTimeout', v => num(v) / 1000],
+  'request.timeout.ms': ['requestTimeout', v => num(v) / 1000],
+  'retry.backoff.ms': ['retryBackoff', num],
+  'max.in.flight.requests.per.connection': ['maxInFlight', v => num(v) <= 1 ? 1 : 5],
+  'max.block.ms': ['maxBlock', v => num(v) / 1000],
+  'max.request.size': ['maxMsgMB', v => size(v) / 1048576, [1, 5, 10]],
+  'message.max.bytes': ['maxMsgMB', v => size(v) / 1048576, [1, 5, 10]],
+  'group.id': ['group', v => v],
+  'auto.offset.reset': ['reset', oneOf('earliest', 'latest')],
+  'enable.auto.commit': ['autoCommit', bool],
+  'max.poll.records': ['maxPoll', num],
+  'fetch.min.bytes': ['fetchMin', v => size(v) <= 1 ? 1 : 65536],
+  'session.timeout.ms': ['sessionTimeout', v => num(v) / 1000],
+  'max.poll.interval.ms': ['pollInterval', v => num(v) / 60000],
+  'num.partitions': ['partitions', num],
+  'default.replication.factor': ['rf', num],
+  'min.insync.replicas': ['minIsr', num],
+  'log.retention.hours': ['retention', v => num(v) / 24, [1, 7, 30]],
+  'log.retention.ms': ['retention', v => num(v) / 86400000, [1, 7, 30]],
+  'retention.ms': ['retention', v => num(v) / 86400000, [1, 7, 30]],
+  'replica.lag.time.max.ms': ['replicaLag', v => num(v) / 1000],
+};
+const KNOWN = new Set(['bootstrap.servers', 'key.serializer', 'value.serializer', 'key.deserializer', 'value.deserializer',
+  'heartbeat.interval.ms', 'retry.backoff.max.ms', 'fetch.max.wait.ms', 'max.partition.fetch.bytes', 'fetch.max.bytes',
+  'replica.fetch.max.bytes', 'process.roles', 'node.id', 'controller.quorum.voters', 'listeners', 'advertised.listeners',
+  'controller.listener.names', 'inter.broker.listener.name', 'listener.security.protocol.map', 'log.dirs',
+  'auto.commit.interval.ms', 'auto.create.topics.enable', 'unclean.leader.election.enable', 'offsets.topic.replication.factor',
+  'transaction.state.log.replication.factor', 'transaction.state.log.min.isr', 'cluster.id', 'ack.mode']);
+const UNIT = { batch: ' KB', maxMsgMB: ' MB', retention: ' days', deliveryTimeout: ' s', requestTimeout: ' s', maxBlock: ' s',
+  sessionTimeout: ' s', pollInterval: ' min', replicaLag: ' s', linger: ' ms', retryBackoff: ' ms' };
+function normKey(k) {
+  k = k.replace(/[\[\]"']/g, '');
+  const env = /(?:^|\.)KAFKA_([A-Z0-9_]+)$/.exec(k);
+  if (env) return env[1].toLowerCase().replace(/_/g, '.');
+  k = k.replace(/^spring\.kafka\./, '').replace(/^(producer|consumer|admin|streams|listener)\./, '').replace(/^properties\./, '').replace(/-/g, '.');
+  return { 'fetch.min.size': 'fetch.min.bytes', 'fetch.max.wait': 'fetch.max.wait.ms' }[k] || k;
+}
+// Reads .properties, nested YAML (Spring Boot, docker compose) and KAFKA_* environment variables
+function parseConfig(txt) {
+  const map = {}, stack = [];
+  for (const raw of txt.split(/\r?\n/)) {
+    if (!raw.trim() || /^\s*(#|\/\/|!)/.test(raw)) continue;
+    const m = /^(\s*)(?:-\s+)?["']?([^"'=:\s]+?)["']?\s*([=:])\s*(.*?)\s*,?\s*$/.exec(raw.replace(/\s+#.*$/, ''));
+    if (!m) continue;
+    const indent = m[1].length, k = m[2], v = m[4].replace(/^["']|["']$/g, '');
+    if (m[3] === ':') {
+      while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
+      if (v === '') { stack.push({ indent, key: k }); continue; }
+      map[normKey([...stack.map(s => s.key), k].join('.'))] = v;
+    } else map[normKey(k)] = v;
+  }
+  return map;
+}
+function importConfig(txt) {
+  const map = parseConfig(txt), R = { applied: [], rounded: [], unknown: [], problems: [] }, want = [];
+  const bs = map['bootstrap.servers'];
+  if (bs) {
+    const hs = bs.split(',').map(s => s.trim()).filter(Boolean);
+    if (hs.length) {
+      S.brokers = clamp(hs.length, 1, 5);
+      const h = /^(?:[a-z]+:\/\/)?([A-Za-z][\w-]*?)-?\d*(?::\d+)?$/.exec(hs[0]);
+      if (h) S.host = h[1];
+      R.applied.push('bootstrap.servers');
+      R.rounded.push(`<code>bootstrap.servers</code> lists ${pl(hs.length, 'address', 'addresses')}, so the cluster has ${pl(S.brokers, 'broker')}. Change it in Cluster if some brokers are not listed.`);
+    }
+  }
+  for (const [k, v] of Object.entries(map)) {
+    const rule = IMPORT[k];
+    if (!rule) { if (!KNOWN.has(k) && /^[a-z][a-z0-9]*(\.[a-z0-9]+)+$/.test(k)) R.unknown.push(k); continue; }
+    const [sk, conv, opts] = rule;
+    let val = conv(v);
+    if (val === undefined || (typeof val === 'number' && !isFinite(val))) { R.problems.push(`<code>${esc(k)}=${esc(v)}</code> is not a value Kafka accepts.`); continue; }
+    const asked = val;
+    if (opts) val = opts.reduce((a, b) => Math.abs(b - val) < Math.abs(a - val) ? b : a);
+    S[sk] = val; R.applied.push(k); want.push({ k, v, sk, asked });
+    if (k === 'retries' && ![0, 3].includes(num(v)) && num(v) < 1000) want[want.length - 1].note = 'Kafka Pilot offers never, 3 times, or until time runs out';
+  }
+  normalize();
+  for (const w of want) if (S[w.sk] !== w.asked || w.note)
+    R.rounded.push(`<code>${esc(w.k)}=${esc(w.v)}</code> is now ${esc(String(S[w.sk]))}${UNIT[w.sk] || ''}${w.note ? ` (${w.note})` : ''}.`);
+  // Combinations Kafka rejects or that quietly lose data
+  const raw = k => map[k], idem = bool(raw('enable.idempotence'));
+  const acksAll = raw('acks') === undefined || /^(all|-1)$/i.test(raw('acks'));
+  if (idem === true && !acksAll) R.problems.push('<code>enable.idempotence=true</code> needs <code>acks=all</code>. The producer fails to start with a ConfigException.');
+  if (idem === true && num(raw('max.in.flight.requests.per.connection')) > 5) R.problems.push('<code>enable.idempotence=true</code> allows at most 5 requests in flight. The producer fails to start with a ConfigException.');
+  if (idem === true && num(raw('retries')) === 0) R.problems.push('<code>enable.idempotence=true</code> needs retries. The producer fails to start with a ConfigException.');
+  if (raw('delivery.timeout.ms') !== undefined) {
+    const dt = num(raw('delivery.timeout.ms')), sum = (num(raw('linger.ms')) || 0) + (raw('request.timeout.ms') ? num(raw('request.timeout.ms')) : 30000);
+    if (dt < sum) R.problems.push(`<code>delivery.timeout.ms</code> (${dt}) is smaller than linger.ms + request.timeout.ms (${sum}). The producer fails to start.`);
+  }
+  const st = raw('session.timeout.ms') ? num(raw('session.timeout.ms')) : 45000;
+  if (raw('heartbeat.interval.ms') && num(raw('heartbeat.interval.ms')) >= st) R.problems.push('<code>heartbeat.interval.ms</code> must be lower than session.timeout.ms, or the consumer looks dead between heartbeats and keeps losing its partitions. A third of the session timeout is typical.');
+  if (raw('session.timeout.ms') && (st < 6000 || st > 1800000)) R.problems.push(`<code>session.timeout.ms=${st}</code> is outside what brokers allow by default (6 s to 30 min), so the consumer cannot join its group.`);
+  const rf = num(raw('default.replication.factor')), mi = num(raw('min.insync.replicas'));
+  if (rf && mi && mi > rf) R.problems.push(`<code>min.insync.replicas</code> (${mi}) is higher than the replication factor (${rf}), so every acks=all write fails.`);
+  const mrs = size(raw('max.request.size')), mmb = size(raw('message.max.bytes'));
+  if (mrs && mmb && mrs > mmb) R.problems.push('<code>max.request.size</code> is larger than message.max.bytes, so the broker refuses large messages the producer accepted (RecordTooLargeException).');
+  if (bool(raw('unclean.leader.election.enable')) === true) R.problems.push('<code>unclean.leader.election.enable=true</code> lets an out-of-date copy become leader. Messages it never received are lost.');
+  save();
+  return R;
+}
+function importReportHtml() {
+  if (!importReport) return '';
+  const R = importReport;
+  return `<div class="report" id="import-report" tabindex="-1">
+    <h4>${R.applied.length ? `Loaded ${pl(R.applied.length, 'setting')}. The diagram and every step now use them.` : 'No settings Kafka Pilot knows were found.'}</h4>
+    ${R.problems.length ? `<div class="notes">${R.problems.map(t => `<div class="note warn">${ICON.warn}<div><span class="sr">Problem: </span>${t}</div></div>`).join('')}</div>` : (R.applied.length ? `<div class="note ok">${ICON.ok}<div>No combinations that Kafka rejects.</div></div>` : '')}
+    ${R.rounded.length ? `<div><b>Adjusted to fit</b><ul>${R.rounded.map(x => `<li>${x}</li>`).join('')}</ul></div>` : ''}
+    ${R.unknown.length ? `<div><b>Not covered by Kafka Pilot yet</b><p class="help">${R.unknown.map(k => `<code class="key">${esc(k)}</code>`).join(' ')}</p></div>` : ''}
+  </div>`;
+}
+
+/* ---------- Controls ---------- */
+const key = k => k ? ` <code class="key">${k}</code>` : '';
+const help = h => h ? `<p class="help">${h}</p>` : '';
+function choice(k, label, code, opts, h) {
+  return `<fieldset class="q"><legend class="qlabel">${label}${key(code)}</legend>${help(h)}<div class="tiles">${opts.map(o =>
+    `<label class="tile"><input type="radio" name="${k}" id="${k}-${o.v}" data-k="${k}" value="${o.v}"${String(S[k]) === String(o.v) ? ' checked' : ''}${o.off ? ' disabled' : ''}>
+      ${o.icon ? `<span class="ti">${ic(o.icon, 18)}</span>` : ''}<b>${o.label}</b>${o.code ? `<code class="key">${o.code}</code>` : ''}<span>${o.hint}</span></label>`).join('')}</div></fieldset>`;
+}
+function stepper(k, label, code, min, max, h) {
+  return `<div class="q stepq"><div class="qlabel" id="${k}-lbl">${label}${key(code)}</div>
+    <div class="stepper" role="group" aria-labelledby="${k}-lbl">
+      <button type="button" id="${k}-dec" data-step="${k}" data-d="-1" aria-label="Decrease"${S[k] <= min ? ' disabled' : ''}>${ic('minus', 18)}</button>
+      <output id="${k}-out" aria-live="polite">${S[k]}</output>
+      <button type="button" id="${k}-inc" data-step="${k}" data-d="1" aria-label="Increase"${S[k] >= max ? ' disabled' : ''}>${ic('plus', 18)}</button>
+    </div>${h ? `<p class="help after">${h}</p>` : ''}</div>`;
+}
+function range(k, label, code, min, max, st, fmt, h) {
+  return `<div class="q"><label class="qlabel" for="${k}">${label}${key(code)}</label>${help(h)}
+    <div class="range"><input type="range" id="${k}" data-k="${k}" min="${min}" max="${max}" step="${st}" value="${S[k]}" data-fmt="${fmt}">
+    <output id="${k}-out" for="${k}">${S[k]} ${fmt}</output></div></div>`;
+}
+function text(k, label, code, h) {
+  const err = fieldError(k);
+  return `<div class="q"><label class="qlabel" for="${k}">${label}${key(code)}</label>${help(h)}
+    <input class="field" type="text" id="${k}" data-k="${k}" value="${esc(S[k])}" spellcheck="false" autocomplete="off" aria-describedby="${k}-err"${err ? ' aria-invalid="true"' : ''}>
+    <p class="field-error" id="${k}-err"${err ? '' : ' hidden'}>${err}</p></div>`;
+}
+function groupsHtml() {
+  return `<div class="sub"><h3>Other consumer groups</h3><p class="help after">Each group gets its own copy of every message and keeps its own read position, so a slow group never holds back a fast one. Use one group per service that needs this data.</p>` +
+    S.more.map((gr, i) => `<div class="gcard g${i + 1}"><div class="row2">
+      <div class="q"><label class="qlabel" for="gname-${i}">Group name ${key('group.id')}</label><input class="field" type="text" id="gname-${i}" data-gname="${i}" value="${esc(gr.name)}" spellcheck="false" autocomplete="off"></div>
+      <div class="q stepq"><div class="qlabel" id="gc-${i}-lbl">Consumers</div><div class="stepper" role="group" aria-labelledby="gc-${i}-lbl">
+        <button type="button" id="gc-${i}-dec" data-gstep="${i}" data-d="-1" aria-label="Decrease"${gr.consumers <= 1 ? ' disabled' : ''}>${ic('minus', 18)}</button>
+        <output aria-live="polite">${gr.consumers}</output>
+        <button type="button" id="gc-${i}-inc" data-gstep="${i}" data-d="1" aria-label="Increase"${gr.consumers >= 8 ? ' disabled' : ''}>${ic('plus', 18)}</button></div></div></div>
+      <div class="q"><label class="qlabel" for="gspeed-${i}">Time to handle one message</label><select class="field" id="gspeed-${i}" data-gspeed="${i}">${Object.entries(SPEED).map(([v, sp]) => `<option value="${v}"${gr.speed === v ? ' selected' : ''}>${sp.label}: ${sp.hint}</option>`).join('')}</select></div>
+      <div><button type="button" class="btn" id="gdel-${i}" data-gdel="${i}">${ic('x')}Remove this group</button></div></div>`).join('') +
+    (S.more.length < 2 ? `<div><button type="button" class="btn" id="gadd" data-gadd>${ic('plus')}Add a consumer group</button></div>` : '<p class="help after">This tool shows up to 3 groups.</p>') + '</div>';
+}
+const GROUP_NAMES = ['analytics', 'search-indexer', 'audit-archive'];
+function addGroup() {
+  if (S.more.length >= 2) return;
+  const name = GROUP_NAMES.find(n => n !== group() && !S.more.some(g => g.name === n)) || 'other-service';
+  S.more = [...S.more, { name, consumers: 1, speed: 'normal' }];
+  normalize(); save(); renderAll(); announce(`Added group ${name}. It reads every message on its own.`);
+}
+function delGroup(i) {
+  if (!S.more[i]) return;
+  const name = S.more[i].name;
+  S.more = S.more.filter((_, k) => k !== i);
+  logs.forEach(L => { L.cons.splice(i + 1, 1); L.pos.splice(i + 1, 1); });
+  lagHist.splice(i + 1, 1);
+  normalize(); save(); renderAll(); announce(`Removed group ${name}.`);
+}
+const intro = (h, p) => `<div class="intro"><h2 id="step-h" tabindex="-1">${h}</h2><p>${p}</p></div>`;
+
+function controlsHtml() {
+  const id = STEPS[step].id;
+  if (id === 'goal') return intro('What is this topic for?', 'Pick the closest match. It fills in sensible settings for every step, and you can change any of them later.') +
+    choice('goal', 'Kind of data', '', Object.entries(PRESETS).map(([v, p]) => ({ v, label: p.label, hint: p.hint, icon: { starter: 'route', safe: 'shield-check', balanced: 'scale', bulk: 'stack-2', fast: 'bolt', jobs: 'list-check', iot: 'cpu', cdc: 'database', audit: 'history' }[v] }))) +
+    (isCustom() ? `<div class="note info">${ICON.info}<div>You changed some settings after picking “${PRESETS[S.goal].label}”. Pick it again to reset them.</div></div>` : '') +
+    `<div class="row2">${text('topic', 'Topic name', '', 'Lowercase words with dashes or dots work best.')}
+      ${text('host', 'Broker host name prefix', '', `Brokers will be named ${esc(hostPrefix())}1, ${esc(hostPrefix())}2 and so on.`)}</div>` +
+    `<div class="sub"><h3>Already have a config?</h3>
+      <div class="q"><label class="qlabel" for="importText">Paste it to load and check it</label>
+      <p class="help">Works with .properties files, Spring Boot application.yml and Docker KAFKA_ variables. Kafka Pilot fills in every step and points out combinations Kafka rejects.</p>
+      <textarea class="field" id="importText" spellcheck="false" autocomplete="off" placeholder="acks=all&#10;linger.ms=10&#10;group.id=orders-service">${esc(importText)}</textarea>
+      <div class="actions"><button type="button" class="btn primary" data-act="import">${ic('file-import')}Load and check</button>
+      <button type="button" class="btn" data-act="example">${ic('bug')}Try a broken example</button></div>
+      ${savedText !== null ? `<p class="field-msg">The example replaced your text. <button type="button" class="link-btn" data-act="restore">Put my text back</button></p>` : ''}</div>
+      ${importReportHtml()}</div>`;
+  if (id === 'cluster') return intro('Where messages are stored', 'Brokers are the servers that store messages. A topic is split into partitions, and each partition is copied to several brokers so one failure does not lose data.') +
+    `<div class="row2">${stepper('brokers', 'How many brokers?', '', 1, 5, '3 is the usual minimum for production.')}
+      ${stepper('partitions', 'How many partitions?', 'num.partitions', 1, 12, 'More partitions let more consumers read in parallel. You can add some later but never remove them.')}</div>
+    <div class="row2">${stepper('rf', 'Copies of each message', 'replication.factor', 1, S.brokers, `At most one copy per broker, so up to ${S.brokers} here.`)}
+      ${stepper('minIsr', 'Copies that must confirm a write', 'min.insync.replicas', 1, S.rf, 'With acks=all, writes are refused when fewer copies are online.')}</div>` +
+    choice('retention', 'How long should messages be kept?', 'retention.ms', [
+      { v: 1, label: '1 day', hint: 'Short replay window, small disks' },
+      { v: 7, label: '7 days', hint: "Kafka's default" },
+      { v: 30, label: '30 days', hint: 'Replay a month of history' }], 'Messages stay after they are read, so other services can read them too.') +
+    `<div class="note info">${ICON.info}<div>Try it: select a broker’s name in the diagram to switch it off and see which partitions keep working.</div></div>` +
+    `<div class="sub"><h3>Limits and slow brokers</h3>` +
+    choice('maxMsgMB', 'Largest single message', 'message.max.bytes', [
+      { v: 1, label: '1 MB', hint: "Kafka's default" },
+      { v: 5, label: '5 MB', hint: 'Bigger JSON documents' },
+      { v: 10, label: '10 MB', hint: 'Rarely a good idea' }], 'This limit lives in three places: the brokers, the producer and the consumer. Your files set all three to match.') +
+    range('replicaLag', 'Drop a slow follower after', 'replica.lag.time.max.ms', 5, 60, 5, 's', 'A follower this far behind stops counting toward “copies that must confirm” until it catches up.') + '</div>';
+  if (id === 'producer') return intro('How your app sends messages', 'The producer is the code in your app that writes messages to the topic.') +
+    stepper('producers', 'Apps sending to this topic', '', 1, 5, 'Each app runs its own producer with these settings. All of them share the same partitions.') +
+    choice('acks', 'How sure should the producer be before moving on?', 'acks', [
+      { v: '0', label: 'Don’t wait', code: 'acks=0', hint: 'Fastest. Lost messages go unnoticed.' },
+      { v: '1', label: 'The leader saved it', code: 'acks=1', hint: 'Fast. Lost if the leader crashes before copying.' },
+      { v: 'all', label: 'All copies saved it', code: 'acks=all', hint: 'Safest. Kafka’s default since 3.0.' }]) +
+    `<label class="switch q"><input type="checkbox" id="idem" data-k="idem"${S.idem ? ' checked' : ''}${S.acks !== 'all' || S.retries === '0' ? ' disabled' : ''}>
+      <span class="txt"><span class="qlabel">Prevent duplicates when retrying${key('enable.idempotence')}</span>
+      <span class="help">${S.acks !== 'all' ? 'Needs “All copies saved it” above.' : S.retries === '0' ? 'Needs retries. Turn retrying back on below.' : 'If a confirmation gets lost and the producer sends again, the broker drops the repeat.'}</span></span></label>` +
+    range('linger', 'Wait to fill a batch', 'linger.ms', 0, 100, 5, 'ms', 'Waiting a few milliseconds lets many messages travel in one request.') +
+    choice('batch', 'Largest batch per partition', 'batch.size', [
+      { v: 16, label: '16 KB', hint: "Kafka's default" },
+      { v: 64, label: '64 KB', hint: 'Steady, busy traffic' },
+      { v: 256, label: '256 KB', hint: 'Bulk loads' }]) +
+    choice('compression', 'Compress batches', 'compression.type', [
+      { v: 'none', label: 'None', hint: 'No CPU cost, most bytes' },
+      { v: 'lz4', label: 'lz4', hint: 'Fast, good savings' },
+      { v: 'zstd', label: 'zstd', hint: 'Smallest, a bit more CPU' },
+      { v: 'snappy', label: 'snappy', hint: 'Fast, larger than lz4' },
+      { v: 'gzip', label: 'gzip', hint: 'Small but slow' }]) +
+    `<div class="sub"><h3>Message keys</h3>
+      <p class="help">The key decides the partition. Messages with the same key always land in the same partition, so they stay in order. Add your own keys and watch where they go.</p>
+      <div class="q"><label class="qlabel" for="newKey">Add a key</label>
+      <div class="addrow"><input class="field" id="newKey" type="text" maxlength="40" placeholder="order-1001" spellcheck="false" autocomplete="off" aria-describedby="key-msg">
+        <button type="button" class="btn" data-act="addkey">${ic('plus')}Add key</button></div>
+      <p class="field-msg" id="key-msg" aria-live="polite">${esc(keyMsg)}</p></div>
+      ${S.keys.length ? `<ul class="chips">${S.keys.map((k, i) => `<li class="chip">${esc(k)} <small>P${partitionFor(k)}</small><button type="button" data-delkey="${i}" aria-label="Remove ${esc(k)}">${ic('x')}</button></li>`).join('')}</ul>` : ''}
+      <label class="switch q"><input type="checkbox" id="hotKey" data-k="hotKey"${S.hotKey ? ' checked' : ''}${S.keys.length ? '' : ' disabled'}>
+        <span class="txt"><span class="qlabel">Send most traffic with the first key</span>
+        <span class="help">See what one very busy customer does to a single partition and its consumer.</span></span></label></div>` +
+    `<div class="sub"><h3>When a send fails</h3>` +
+    choice('retries', 'How many times should it retry?', 'retries', [
+      { v: 'max', label: 'Until time runs out', hint: 'Recommended. The total time limit below decides.' },
+      { v: '3', label: 'Up to 3 times', hint: 'Then report the error.' },
+      { v: '0', label: 'Never', hint: 'One failed attempt loses the message.' }]) +
+    range('deliveryTimeout', 'Total time to deliver a message', 'delivery.timeout.ms', 10, 600, 10, 's', 'Counts batching, every attempt and every pause. Kafka requires at least linger.ms + request.timeout.ms, so this rises on its own when needed.') +
+    range('requestTimeout', 'Wait for a broker to answer', 'request.timeout.ms', 5, 120, 5, 's', 'How long one attempt waits before it counts as failed.') +
+    range('retryBackoff', 'Pause before retrying', 'retry.backoff.ms', 50, 2000, 50, 'ms', 'The pause doubles after each failure, up to 1 s or this value if it is larger.') +
+    choice('maxInFlight', 'Requests sent at once to each broker', 'max.in.flight.requests.per.connection', [
+      { v: 5, label: 'Up to 5', hint: 'Faster. Order is kept when duplicate prevention is on.' },
+      { v: 1, label: 'One at a time', hint: 'Slower. Order is always kept.' }]) +
+    range('maxBlock', 'How long send() may wait', 'max.block.ms', 1, 120, 1, 's', 'When the buffer is full or no broker can be reached, send() blocks this long, then throws an error in your code.') + '</div>';
+  if (id === 'consumer') return intro('How your services read messages', 'Consumers that share a group name split the work: each partition is read by exactly one member of the group.') +
+    `<div class="row2">${text('group', 'Consumer group name', 'group.id', 'Use one name per service. Two services with different names each get every message.')}
+      ${stepper('consumers', 'Consumers in the group', '', 1, 8, `You have ${pl(S.partitions, 'partition')}, so up to ${S.partitions} can work at once.`)}</div>` +
+    choice('speed', 'How long does your code take to handle one message?', '', Object.entries(SPEED).map(([v, sp]) => ({ v, label: sp.label, hint: sp.hint })),
+      `One consumer handles about ${Math.round(1000 / SPEED[S.speed].ms)} messages a second. If producers send more than the whole group can handle, lag grows.`) +
+    choice('reset', 'Where should a new group start reading?', 'auto.offset.reset', [
+      { v: 'earliest', label: 'From the beginning', hint: 'Read everything still stored' },
+      { v: 'latest', label: 'From now on', hint: 'Only messages sent after it starts' }]) +
+    choice('autoCommit', 'When is a message marked as read?', 'enable.auto.commit', [
+      { v: 'false', label: 'After my code handles it', hint: 'Recommended. Call commitSync() after processing.' },
+      { v: 'true', label: 'Automatically every 5 s', hint: 'Simpler. A crash can skip or repeat messages.' }]) +
+    range('maxPoll', 'Messages per poll', 'max.poll.records', 10, 1000, 10, 'max', 'How many messages your code gets each time it asks for more.') +
+    choice('fetchMin', 'When should a fetch return?', 'fetch.min.bytes', [
+      { v: 1, label: 'As soon as anything arrives', hint: 'Lowest delay' },
+      { v: 65536, label: 'At 64 KB or after 0.5 s', hint: 'Fewer, fuller fetches' }]) +
+    `<div class="sub"><h3>When a consumer is slow or crashes</h3>` +
+    range('sessionTimeout', 'Treat a silent consumer as dead after', 'session.timeout.ms', 10, 120, 5, 's', 'Consumers send a heartbeat every third of this time. Shorter means faster recovery but more false alarms during long garbage-collection pauses.') +
+    range('pollInterval', 'Time limit to handle one poll’s messages', 'max.poll.interval.ms', 1, 30, 1, 'min', 'If your code takes longer, Kafka assumes it is stuck and gives its partitions to another consumer.') +
+    choice('onFail', 'If your code fails on a message', '', [
+      { v: 'dlq', icon: 'mail-forward', label: 'Move it to a dead-letter topic', hint: `Sends it to ${esc(topic())}.dlq and continues. Recommended.` },
+      { v: 'retry', icon: 'repeat', label: 'Stop and retry it', hint: 'Keeps order, but one bad message blocks its partition.' }]) + '</div>' + groupsHtml();
+  // files
+  const w = checks();
+  return intro('Your files', 'Copy these into your project. Every setting has a comment that says what it does.') +
+    choice('lang', 'Your app is written in', '', [
+      { v: 'java', label: 'Java', hint: '.properties files' },
+      { v: 'spring', label: 'Spring Boot', hint: 'application.yml' },
+      { v: 'python', label: 'Python', hint: 'confluent-kafka' },
+      { v: 'node', label: 'Node.js', hint: 'kafka-javascript' },
+      { v: 'go', label: 'Go', hint: 'confluent-kafka-go' }]) +
+    `<div class="notes">${w.length ? w.map(c => noteHtml(c, true)).join('') :
+      `<div class="note ok">${ICON.ok}<div>No problems found. These settings fit together.</div></div>`}</div>
+    <div class="files">${[...(LANGS[S.lang] || LANGS.java), 'docker-compose.yml', 'server.properties', 'setup.sh'].map(fileBlock).join('')}</div>`;
+}
+
+const ICON = { warn: ic('alert-triangle', 18), info: ic('info-circle', 18), ok: ic('circle-check', 18) };
+function noteHtml(c, withLink) {
+  return `<div class="note ${c.lvl}">${ICON[c.lvl]}<div><span class="sr">${c.lvl === 'warn' ? 'Warning: ' : 'Note: '}</span>${c.text}</div>${withLink ? `<button type="button" class="link-btn go" data-goto="${c.step}">Change in ${STEPS[c.step].name}</button>` : ''}</div>`;
+}
+
+/* ---------- Readout ---------- */
+function explainHtml() {
+  const id = STEPS[step].id, w = checks().filter(c => c.step === step);
+  const P = S.partitions, C = S.consumers;
+  const lossTol = S.rf - 1, writeTol = S.acks === 'all' ? S.rf - S.minIsr : S.rf - 1;
+  const store = `Every message is kept on ${pl(S.rf, 'broker')}. ${lossTol ? `Up to ${pl(lossTol, 'broker')} can fail without losing saved messages.` : 'If that broker fails, its messages are lost.'}`;
+  const writes = writeTol ? `Writes keep working with up to ${pl(writeTol, 'broker')} down.` : (S.rf > 1 ? 'Writes stop if any broker holding a copy goes down.' : 'Writes stop while the broker holding a partition is down.');
+  const ackText = { '0': 'The producer sends and moves on without waiting for any confirmation.',
+    '1': 'The producer waits until the partition leader has saved each message.',
+    'all': `The producer waits until every in-sync copy has saved each message. If fewer than ${pl(S.minIsr, 'copy', 'copies')} are online, the write is refused rather than stored unsafely.` }[S.acks];
+  const batchText = S.linger ? `Messages wait up to ${S.linger} ms so several travel together, up to ${S.batch} KB per partition. Fewer, bigger requests mean more throughput for a small delay.` : 'Each message is sent the moment you produce it. Lowest delay, but many small requests.';
+  const comp = { none: 'Batches are sent uncompressed.', lz4: 'Batches are compressed with lz4: fast, with good savings on text and JSON.', zstd: 'Batches are compressed with zstd: the smallest on the wire, for a little more CPU.', snappy: 'Batches are compressed with snappy: fast, a little larger than lz4.', gzip: 'Batches are compressed with gzip: small but slow. zstd is usually a better choice.' }[S.compression];
+  const assign = Array.from({ length: C }, (_, j) => {
+    const mine = []; for (let p = j; p < P; p += C) mine.push('P' + p);
+    return `<li class="c">Consumer ${j + 1}: ${mine.length ? list(mine) : 'idle, nothing to read'}</li>`;
+  }).join('');
+  let facts = '', file = '', visual = '';
+  if (id === 'goal') {
+    facts = `<li class="p">${ackText}</li><li class="b">${store} ${writes}</li><li class="c">${pl(C, 'consumer')} in group “${esc(group())}” share ${pl(P, 'partition')}, and each starts reading ${S.reset === 'earliest' ? 'from the beginning' : 'from new messages only'}.</li>`;
+  } else if (id === 'cluster') {
+    facts = `<li class="b">${store}</li><li class="b">${writes}</li><li class="b">The topic has ${pl(P, 'partition')}. Each one has a leader that takes all reads and writes, and followers that copy it.</li><li class="b">Messages are kept for ${pl(S.retention, 'day')}, even after they are read.</li><li class="b">Messages can be up to ${S.maxMsgMB} MB. Larger ones are refused with RecordTooLargeException.</li>`;
+    file = 'server.properties';
+  } else if (id === 'producer') {
+    facts = `<li class="p">${ackText}</li><li class="p">${S.idem ? 'Retries never create duplicates.' : 'A retry after a lost confirmation can store the same message twice.'}</li><li class="p">${batchText}</li><li class="p">${comp}</li><li class="p">Messages with the same key always go to the same partition, so they stay in order.</li>`;
+    visual = hashVisual() + keyVisual() + retryVisual();
+    file = 'producer.properties';
+  } else if (id === 'consumer') {
+    const budget = S.pollInterval * 60000 / S.maxPoll;
+    facts = `<li class="c">${pl(C, 'consumer')} share ${pl(P, 'partition')}. Kafka gives each partition to one of them:</li>${assign}<li class="c">Your code gets up to ${S.maxPoll} messages per poll and has ${pl(S.pollInterval, 'minute')} to handle them, about ${fmtS(budget)} per message.</li><li class="c">${S.onFail === 'dlq' ? `A message your code cannot handle goes to ${esc(topic())}.dlq, and reading continues.` : 'A message your code cannot handle is read again until it succeeds. Later messages in that partition wait.'}</li>`;
+    facts += `<li class="c">Your code takes ${SPEED[S.speed].label.toLowerCase()} per message, so one consumer handles about ${Math.round(1000 / SPEED[S.speed].ms)} messages a second.</li>`;
+    if (S.more.length) facts += `<li class="c">${1 + S.more.length} groups read this topic. Each one gets every message and keeps its own position; inside a group, partitions are split.</li>`;
+    visual = heartbeatVisual();
+    file = 'consumer.properties';
+  }
+  return `<h3>With these settings</h3><ul class="facts">${facts}</ul>${visual}${w.length ? `<div class="notes">${w.map(c => noteHtml(c)).join('')}</div>` : ''}${file ? fileBlock(file) : ''}`;
+}
+// hash % N, step by step, with the person's own keys
+const hashOf = k => murmur2(k) & 0x7fffffff;
+const fmtN = n => n.toLocaleString('en-US');
+function hashLine(k) {
+  const h = hashOf(k), P = S.partitions;
+  return `<code>${esc(k)}</code> → hash <b>${fmtN(h)}</b> → ${fmtN(h)} ÷ ${P} = ${fmtN(Math.floor(h / P))}, remainder <b>${h % P}</b> → <b>P${h % P}</b>`;
+}
+function hashVisual() {
+  const P = S.partitions, k = S.keys[0] || 'customer-42', h = hashOf(k);
+  return `<div class="visual hashcard" id="hash-card" tabindex="-1"><p><b>What does <code>hash % ${P}</code> mean?</b> It is how Kafka picks the partition for a message that has a key.</p>
+    <ol class="hsteps">
+      <li><b>hash</b>: Kafka runs the key through a hash function (murmur2) that turns any text into a big number. The same key always gives the same number, and different keys give numbers that look random, so keys spread evenly.</li>
+      <li><b>%</b> (modulo) means “the remainder after dividing”. Dividing by ${P} always leaves a remainder from 0 to ${P - 1}: exactly one partition number.</li>
+      <li><b>The remainder is the partition.</b> For <code>${esc(k)}</code>: ${fmtN(h)} ÷ ${P} = ${fmtN(Math.floor(h / P))} with ${h % P} left over, so it goes to <b>P${h % P}</b>. Every message with this key does, which keeps them in order.</li>
+    </ol>
+    <ul class="hrows">${S.keys.map(x => `<li>${hashLine(x)}</li>`).join('')}</ul>
+    <label class="htry"><span>Try a key</span><input class="field" id="hash-try" type="text" maxlength="40" spellcheck="false" autocomplete="off" placeholder="order-1001"></label>
+    <p class="hrows" id="hash-out" aria-live="polite"></p>
+    <p class="small">Change the partition count and the remainders change, so keys move to other partitions. Messages without a key have no fixed partition: Kafka fills one partition with a batch, then moves to the next.</p></div>`;
+}
+function showHash() {
+  if (STEPS[step].id !== 'producer') go(STEPS.findIndex(s => s.id === 'producer'));
+  const c = $('hash-card'); if (!c) return;
+  c.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' }); c.focus({ preventScroll: true });
+  if (motionOK()) gsap.fromTo(c, { boxShadow: '0 0 0 3px var(--producer)' }, { boxShadow: '0 0 0 0px var(--producer)', duration: 1.4, ease: 'power2.out', clearProps: 'boxShadow' });
+}
+function keyVisual() {
+  if (!S.keys.length) return '';
+  const P = S.partitions, C = S.consumers;
+  const rows = S.keys.map(k => { const p = partitionFor(k); return `<li><code>${esc(k)}</code> goes to P${p}, read by Consumer ${p % C + 1}</li>`; }).join('');
+  let hot = '';
+  if (S.hotKey) {
+    // 80% of traffic carries the first key; the rest spreads evenly
+    const hp = partitionFor(S.keys[0]), share = Array.from({ length: P }, (_, p) => .2 / P + (p === hp ? .8 : 0));
+    const load = Array.from({ length: C }, (_, j) => share.reduce((a, v, p) => a + (p % C === j ? v : 0), 0));
+    const busy = load.indexOf(Math.max(...load)), W = 400, bw = (W - 16) / P, x = p => 8 + bw * p;
+    let s = `<svg class="tl" viewBox="0 0 ${W} 104" aria-hidden="true">`;
+    share.forEach((v, p) => {
+      const h = Math.max(2, 56 * v / share[hp]);
+      s += `<rect class="bar${p === hp ? ' hot' : ''}" data-fid="k-bar-${p}" x="${x(p) + 2}" y="${78 - h}" width="${bw - 4}" height="${h}" rx="2"/>
+        <text data-fid="k-bl-${p}" x="${x(p) + bw / 2}" y="98" text-anchor="middle">P${p}</text>`;
+    });
+    s += `<text class="bad" data-fid="k-pct" x="${clamp(x(hp) + bw / 2, 24, W - 24)}" y="15" text-anchor="middle">${Math.round(share[hp] * 100)}%</text></svg>`;
+    hot = `<div class="visual"><p><b>One busy key makes one hot partition.</b> P${hp} gets about ${Math.round(share[hp] * 100)}% of all messages, so Consumer ${busy + 1} does ${Math.round(load[busy] * 100)}% of the work. More consumers will not help, because one partition is read by only one consumer. Use a more specific key, like the order ID instead of the customer.</p>${s}</div>`;
+  }
+  return `<div class="visual"><p><b>Where your keys go.</b> Kafka hashes each key (murmur2) and divides by the ${pl(P, 'partition')}. Changing the partition count moves keys to new partitions, so their order is only kept from that point on.</p><ul class="keymap">${rows}</ul></div>${hot}`;
+}
+function retryVisual() {
+  if (S.acks === '0') return `<div class="visual"><p><b>No retries with acks=0.</b> The producer never hears whether a send worked, so it cannot retry. Failures are silent.</p></div>`;
+  const plan = retryPlan(), W = 400, x = v => 8 + (W - 16) * v / plan.D;
+  let s = `<svg class="tl" viewBox="0 0 ${W} 76" aria-hidden="true"><rect class="base" x="8" y="22" width="${W - 16}" height="24" rx="4"/>`;
+  for (const g of plan.seg) {
+    if (g.k === 'wait') continue;
+    const w = Math.max(1.5, x(g.b) - x(g.a) - (g.k === 'try' ? 1.5 : 0));
+    s += `<rect class="${g.k}" data-fid="r-${g.k}-${g.n || 0}" x="${x(g.a)}" y="22" width="${w}" height="24" rx="3"/>`;
+    if (g.k === 'try' && w > 64) s += `<text class="in" data-fid="r-tt-${g.n}" x="${x(g.a) + w / 2}" y="38.5" text-anchor="middle">try ${g.n}</text>`;
+  }
+  const ex = x(plan.end);
+  s += `<line class="end" data-fid="r-end" x1="${ex}" y1="16" x2="${ex}" y2="52"/>
+    <text x="8" y="13">0 s: send()</text>
+    <text data-fid="r-endt" x="${Math.max(ex, 200)}" y="70" text-anchor="end" class="bad">gives up at ${fmtS(plan.end)}</text></svg>`;
+  const tries = plan.tries === 1 ? 'makes 1 attempt' : `makes ${plan.tries} attempts`;
+  return `<div class="visual"><p><b>If a broker stops answering,</b> the producer ${tries} of up to ${S.requestTimeout} s each, pausing between them, then your send callback gets an error.</p>${s}
+    <p class="small">Refused writes, like the red dots in the diagram, are retried the same way. Messages wait in a memory buffer meanwhile; when it fills, send() blocks for up to ${S.maxBlock} s.</p></div>`;
+}
+function heartbeatVisual() {
+  const sess = S.sessionTimeout * 1000, hb = Math.floor(sess / 3), last = 2 * hb, T = last + sess + hb * .7, W = 400, x = v => 8 + (W - 16) * v / T;
+  let s = `<svg class="tl" viewBox="0 0 ${W} 76" aria-hidden="true"><rect class="base" x="8" y="22" width="${W - 16}" height="24" rx="4"/>
+    <rect class="gone" data-fid="h-gone" x="${x(last)}" y="22" width="${x(last + sess) - x(last)}" height="24" rx="3"/>`;
+  for (let i = 0; i < 3; i++) s += `<line class="hb" data-fid="h-hb-${i}" x1="${x(i * hb) + 1}" y1="22" x2="${x(i * hb) + 1}" y2="46"/>`;
+  s += `<circle class="crash" data-fid="h-crash" cx="${x(last + hb * .3)}" cy="34" r="5"/>
+    <line class="end" data-fid="h-end" x1="${x(last + sess)}" y1="16" x2="${x(last + sess)}" y2="52"/>
+    <text x="8" y="70">heartbeat every ${fmtS(hb)}</text>
+    <text data-fid="h-endt" x="${x(last + sess)}" y="13" text-anchor="end" class="bad">partitions move</text></svg>`;
+  return `<div class="visual"><p><b>If a consumer crashes,</b> its heartbeats stop. After ${S.sessionTimeout} s of silence Kafka gives its partitions to the others, and they continue from the last committed message.</p>${s}</div>`;
+}
+
+/* ---------- Diagram ---------- */
+const NS = 'http://www.w3.org/2000/svg';
+let G = null;
+// Each partition is drawn as what Kafka really stores: an append-only log of numbered offsets.
+// New messages land on the right end. Dashed slots are saved on the leader but not yet copied to every
+// in-sync replica (above the high watermark), so consumers cannot read them yet.
+// visible slots per log; one fewer when several groups need room for their lag numbers
+let SLOTS = 12;
+let logs = [];
+// cons[g] is group g's committed offset (its read position); pos[g] is the next offset it fetches.
+// A new group starts at the oldest stored message or at the end, as auto.offset.reset says.
+function syncLogs() {
+  const n = 1 + S.more.length;
+  while (logs.length < S.partitions) { const leo = 20 + Math.floor(Math.random() * 60), c = leo - (logs.length % 3); logs.push({ leo, hw: leo, start: Math.max(0, leo - 40), cons: [c], pos: [c] }); }
+  logs.length = S.partitions;
+  for (const L of logs) {
+    // retention keeps roughly the last 60 messages of each partition in this simulation
+    while (L.cons.length < n) { const o = S.reset === 'earliest' ? Math.max(L.start, L.hw - 60) : L.hw; L.cons.push(o); L.pos.push(o); }
+    L.cons.length = n; L.pos.length = n;
+  }
+}
+function geom() {
+  const P = S.partitions, C = S.consumers, B = S.brokers, N = S.producers, top = 116;
+  const gs = groupList(), multi = gs.length > 1;
+  const rowH = Math.min(40, Math.max(multi ? 34 : 30, 340 / P));
+  // each group's box: name, settings row, then its consumers; 12px gap between boxes
+  const blockH = gs.map(g => g.consumers * 40 + 62), consH = blockH.reduce((a, b) => a + b, 0);
+  const bodyH = Math.max(P * rowH, consH, N * 52 + 104, 140);
+  const gy0 = []; blockH.reduce((y, h) => { gy0.push(y); return y + h; }, top + (bodyH - consH) / 2);
+  SLOTS = multi ? 11 : 12;
+  const tx = 262, sw = 25, tEnd = tx + SLOTS * sw, rx = tEnd + (multi ? 84 : 58);
+  return { P, C, B, N, gs, gy0, blockH, multi, top, rowH, bodyH, H: top + bodyH + 40, tx, sw, tEnd, rx, xR: 800, px: 52, qx: 140, cx: 878, py: top + bodyH / 2,
+    busX: g => 816 + g * 13,
+    rowY: i => top + (bodyH - P * rowH) / 2 + rowH * (i + .5),
+    cY: (g, j) => gy0[g] + 50 + 40 * (j + .5),
+    prodY: i => top + bodyH / 2 + (i - (N - 1) / 2) * 52,
+    // the copy of partition p that broker b holds
+    chipX: (p, b) => rx + G.parts[p].reps.indexOf(b) * 34 + 15,
+    // centre of the slot holding offset o, clamped to the visible part of the log
+    slotX: (p, o) => tx + clamp(o - (logs[p].leo - SLOTS), 0, SLOTS - 1) * sw + sw / 2,
+    parts: parts() };
+}
+const pts = a => a.map(p => p.join(',')).join(' ');
+const measure = document.createElement('canvas').getContext('2d');
+const textW = t => { measure.font = '590 13.5px Inter, system-ui, sans-serif'; return measure.measureText(t).width; };
+// A role icon beside a heading; the pair is centred on x, and the icon is dropped when there is no room
+function iconLabel(x, y, txt, icon, cls, room) {
+  const w = textW(txt), total = 21 + w;
+  if (total > room) return `<text class="${cls}" x="${x}" y="${y}" text-anchor="middle">${txt}</text>`;
+  const x0 = x - total / 2;
+  return `<svg class="rico ${cls}" x="${x0}" y="${y - 13}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${TI[icon]}</svg><text class="${cls}" x="${x0 + 21}" y="${y}">${txt}</text>`;
+}
+const icoAt = (name, x, y, s, cls) => `<svg class="${cls}" x="${x}" y="${y}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${TI[name]}</svg>`;
+// producer i > partitioner > the end of partition p's log
+function outPath(p, i = 0) {
+  const y = G.rowY(p), py = G.prodY(Math.min(i, G.N - 1));
+  return [[G.px + 20, py], [G.qx - 52, py], [G.qx - 37, G.py], [G.qx + 37, G.py], [G.tx - 34, y], [G.tEnd - G.sw / 2, y]];
+}
+// slot being read > along the partition > the consumer that owns it
+// slot being read > along the partition > down its group's own lane > the consumer that owns it
+function readPath(p, off, g) {
+  const y = G.rowY(p), cy = G.cY(g, p % G.gs[g].consumers), bx = G.busX(g);
+  return [[G.slotX(p, off), y], [bx, y], [bx, cy], [G.cx - 14, cy]];
+}
+// a slot fades once every group has read it
+// Read cursors: the main group under the log, the second above it, the third under the first
+const curD = (y, g) => [`M0 ${y + 12}l-4.5 5.5h9z`, `M0 ${y - 12}l-4.5 -5.5h9z`, `M0 ${y + 17.5}l-4.5 5.5h9z`][g];
+const curX = (p, g) => G.tx + clamp(logs[p].cons[g] - (logs[p].leo - SLOTS), 0, SLOTS) * G.sw;
+function lagText(p) {
+  const L = logs[p], n = L.cons.map(c => Math.max(0, L.hw - c));
+  if (n.length === 1) return n[0] > 0 ? `lag ${n[0]}` : '';
+  return n.map((v, g) => v > 0 ? `<tspan class="g${g}">${v}</tspan>` : '').filter(Boolean).join(' ');
+}
+function slotState(L, o) { return o < 0 ? 'empty' : o < Math.min(...L.cons) ? 'read' : o < L.hw ? 'ok' : 'new'; }
+function tapeSlots(p) {
+  const L = logs[p], y = G.rowY(p);
+  let s = '';
+  for (let i = 0; i < SLOTS; i++) {
+    const o = L.leo - SLOTS + i, k = slotState(L, o), x = G.tx + i * G.sw;
+    s += `<rect class="slot ${k}" id="s-${p}-${i}" x="${x + 2}" y="${y - 9}" width="${G.sw - 4}" height="18" rx="3"/><text class="so ${k}" id="so-${p}-${i}" x="${x + G.sw / 2}" y="${y + 4}"${o > 999 ? ` textLength="${G.sw - 6}" lengthAdjust="spacingAndGlyphs"` : ''}>${o < 0 ? '' : o}</text>`;
+  }
+  return s;
+}
+// Refresh one log in place, so a new message does not redraw the whole diagram
+function updateTape(p, appended) {
+  const L = logs[p], y = G.rowY(p);
+  for (let i = 0; i < SLOTS; i++) {
+    const o = L.leo - SLOTS + i, k = slotState(L, o), r = $(`s-${p}-${i}`), t = $(`so-${p}-${i}`);
+    if (!r) return;
+    r.setAttribute('class', `slot ${k}`); t.setAttribute('class', `so ${k}`); t.textContent = o < 0 ? '' : o;
+    // offsets past 999 are squeezed to fit their slot
+    if (o > 999) { t.setAttribute('textLength', G.sw - 6); t.setAttribute('lengthAdjust', 'spacingAndGlyphs'); } else t.removeAttribute('textLength');
+  }
+  L.cons.forEach((c, g) => { const cur = $(`cur-${p}-${g}`); if (cur) cur.setAttribute('transform', `translate(${curX(p, g)},0)`); });
+  const lag = $(`lag-${p}`); if (lag) lag.innerHTML = lagText(p);
+  if (appended && motionOK()) {
+    // the log slides one slot to the left, like a conveyor, as the new message joins the end
+    const g = $(`tsl-${p}`), x0 = gsap.getProperty(g, 'x') || 0;
+    gsap.fromTo(g, { x: x0 + G.sw }, { x: 0, duration: .32, ease: 'power2.out', overwrite: true });
+  }
+}
+function snapshot() {
+  const m = new Map();
+  map.querySelectorAll('[data-fid]').forEach(el => {
+    try { const b = el.getBBox(); m.set(el.dataset.fid, { el, cx: b.x + b.width / 2, cy: b.y + b.height / 2 }); } catch (e) {}
+  });
+  return m;
+}
+// FLIP for the diagram: parts that stay glide to their new place, new parts pop in, removed parts fade out
+function flip(prev, oldLeaders) {
+  if (!motionOK() || !prev.size || !introDone) return;
+  const seen = new Set(), born = [];
+  map.querySelectorAll('[data-fid]').forEach(el => {
+    const fid = el.dataset.fid, o = prev.get(fid); seen.add(fid);
+    if (!o) { born.push(el); return; }
+    const b = el.getBBox(), dx = o.cx - (b.x + b.width / 2), dy = o.cy - (b.y + b.height / 2);
+    if (Math.abs(dx) > .5 || Math.abs(dy) > .5) gsap.from(el, { x: dx, y: dy, duration: M.base, ease: M.ease });
+  });
+  if (born.length) gsap.from(born, { opacity: 0, scale: .4, transformOrigin: '50% 50%', duration: M.base, ease: M.pop, stagger: .012 });
+  const ghosts = $('ghosts');
+  for (const [fid, o] of prev) if (!seen.has(fid)) {
+    o.el.removeAttribute('tabindex'); ghosts.appendChild(o.el);
+    gsap.to(o.el, { opacity: 0, scale: .4, transformOrigin: '50% 50%', duration: M.fast, ease: 'power2.in', onComplete: () => o.el.remove() });
+  }
+  // A follower that just became leader pulses so the failover is visible
+  if (oldLeaders) {
+    const promoted = G.parts.filter(st => oldLeaders[st.p] !== undefined && st.leader !== null && oldLeaders[st.p] !== st.leader)
+      .map(st => map.querySelector(`[data-fid="c-${st.p}-${st.leader}"]`)).filter(Boolean);
+    if (promoted.length) gsap.from(promoted, { scale: 1.5, transformOrigin: '50% 50%', duration: .7, ease: 'elastic.out(1, .45)', stagger: .04 });
+  }
+  const sig = `${G.B}|${G.P}|${G.C}|${S.rf}`;
+  if (prevSig && sig !== prevSig) gsap.from('#map .route-p, #map .route-c', { opacity: 0, duration: M.slow, ease: 'power1.out' });
+}
+// The one orchestrated moment: the diagram draws itself, then messages start to flow
+function playIntro() {
+  if (!motionOK()) return;
+  const dash = els => els.forEach(el => { const L = el.getTotalLength(); el.style.strokeDasharray = L; el.style.strokeDashoffset = L; });
+  const q = s => [...map.querySelectorAll(s)];
+  const rp = q('.route-p'), tr = q('.track'), rc = q('.route-c');
+  dash([...rp, ...tr, ...rc]);
+  const undash = { strokeDashoffset: 0, clearProps: 'strokeDasharray,strokeDashoffset' };
+  introTl = gsap.timeline({ defaults: { ease: M.ease }, onComplete: () => { introDone = true; introTl = null; } })
+    .from('[data-fid^="prod-"], [data-fid="acks"]', { scale: 0, transformOrigin: '50% 50%', duration: .45, ease: M.pop })
+    .from('[data-fid="part"]', { scale: 0, transformOrigin: '50% 50%', duration: .35, ease: M.pop }, '-=.2')
+    .to(rp, { ...undash, duration: .45, stagger: .03 }, '-=.1')
+    .from(q('.bhead'), { opacity: 0, y: -10, duration: .35, stagger: .05 }, '<')
+    .from(q('.tape'), { scaleX: 0, transformOrigin: '0% 50%', duration: .45, ease: 'power3.out', stagger: .035 }, '-=.3')
+    .from(q('.pl'), { opacity: 0, duration: .25, stagger: .02 }, '<')
+    .to(tr, { ...undash, duration: .35, ease: 'power2.inOut', stagger: .02 }, '-=.25')
+    .from(q('.cellg'), { scale: 0, transformOrigin: '50% 50%', duration: .3, ease: M.pop, stagger: .01 }, '-=.3')
+    .to(rc, { ...undash, duration: .4, stagger: .025 }, '-=.15')
+    .from(q('[data-fid^="cs-"], .cur'), { scale: 0, opacity: 0, transformOrigin: '50% 50%', duration: .35, ease: M.pop, stagger: .04 }, '-=.2');
+}
+// small buttons drawn inside the diagram (group settings)
+const gbtn = (act, x, y, w, label, tipk, aria, off) => `<g class="gctl${off ? ' off' : ''}" data-gctl="${act}" data-tip="${tipk}" role="button" tabindex="${off ? -1 : 0}" aria-disabled="${!!off}" aria-label="${aria}"><rect x="${x}" y="${y}" width="${w}" height="20" rx="5"/><text x="${x + w / 2}" y="${y + 14}" text-anchor="middle">${label}</text></g>`;
+let gFocus = null;
+function groupCtl(act) {
+  const [k, gs, d] = act.split(':'), g = Number(gs), gr = g > 0 ? S.more[g - 1] : null, next = { fast: 'normal', normal: 'slow', slow: 'fast' };
+  if (k === 'cons') { const v = clamp((gr ? gr.consumers : S.consumers) + Number(d), 1, 8); if (gr) gr.consumers = v; else S.consumers = v; }
+  if (k === 'speed') { if (gr) gr.speed = next[gr.speed]; else S.speed = next[S.speed]; }
+  normalize(); save(); lagHist.length = 0; renderAll();
+  const again = map.querySelector(`[data-gctl="${act}"]`);
+  (again && again.getAttribute('aria-disabled') !== 'true' ? again : map.querySelector(`.gname[data-g="${g}"]`)).focus();
+}
+function focusGroup(g) {
+  gFocus = gFocus === g ? null : g;
+  drawMap();
+  const again = map.querySelector(`.gname[data-g="${g}"]`); again && again.focus();
+  announce(gFocus === null ? 'Showing all groups.' : `Highlighting group ${groupList()[g].name}.`);
+}
+function drawMap() {
+  if (introTl) { introTl.progress(1); introTl = null; introDone = true; }
+  syncLogs();
+  const prev = motionOK() ? snapshot() : new Map(), oldLeaders = G ? G.parts.map(s => s.leader) : null;
+  G = geom();
+  const { P, C, B, top, H, tx, sw, tEnd, rx, xR } = G;
+  let s = `<defs><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect class="hatch-bg" width="8" height="8"/><line class="hatch-ln" x1="0" y1="0" x2="0" y2="8"/></pattern></defs>`;
+  // Three labelled sections: your apps write, the Kafka cluster stores, your services read
+  const laneH = G.H - 12, lc = xR + 4;
+  s += `<g class="lanes" aria-hidden="true">
+    <rect class="lane lp" x="4" y="6" width="194" height="${laneH}" rx="12"/><text class="lanet lp" x="16" y="${G.H - 14}">YOUR APPS · WRITE</text>
+    <rect class="lane lb" x="206" y="6" width="${xR - 210}" height="${laneH}" rx="12"/><text class="lanet lb" x="218" y="${G.H - 14}">KAFKA CLUSTER · STORE</text>
+    <rect class="lane lc" x="${lc}" y="6" width="${996 - lc}" height="${laneH}" rx="12"/><text class="lanet lc" x="${lc + 12}" y="${G.H - 14}">YOUR SERVICES · READ</text></g>`;
+  // producer and partitioner
+  s += '<g class="zone z-p" aria-hidden="true">';
+  for (let p = 0; p < P; p++) { const y = G.rowY(p); s += `<polyline class="route-p" points="${pts([[G.qx + 37, G.py], [tx - 34, y], [tx - 26, y]])}"/>`; }
+  s += `<g data-tip="prod">${iconLabel(G.px, 28, G.N > 1 ? 'Producers' : 'Producer', 'app-window', 'lbl r-p', 104)}</g>`;
+  for (let i = 0; i < G.N; i++) {
+    const y = G.prodY(i);
+    s += `<polyline class="route-p" points="${pts([[G.px + 20, y], [G.qx - 52, y], [G.qx - 37, G.py]])}"/>
+      <g data-fid="prod-${i}" data-tip="prod"><circle class="station-p" id="prod-${i}" cx="${G.px}" cy="${y}" r="20"/>${icoAt('app-window', G.px - 10, y - 10, 20, 'pico')}</g>`;
+  }
+  s += `</g><g class="zone z-p"><g class="partbtn" data-fid="part" data-tip="part" role="button" tabindex="0" aria-label="Partitioner, hash % ${P}. Show what it means">
+    <rect class="part-n" x="${G.qx - 37}" y="${G.py - 16}" width="74" height="32" rx="8"/>
+    <text class="pn" x="${G.qx}" y="${G.py + 4}" aria-hidden="true">hash % ${P}</text></g></g>`;
+  // acks can be changed right here: three switches under the producers
+  const ay = G.prodY(G.N - 1) + 40;
+  s += `<g class="zone z-p" data-fid="acks"><text class="muted" x="${G.px}" y="${ay}" text-anchor="middle" aria-hidden="true">acks</text>`;
+  ['0', '1', 'all'].forEach((v, k) => {
+    const x = G.px - 40 + k * 27, on = S.acks === v;
+    s += `<g class="ackseg${on ? ' on' : ''}" data-acks="${v}" data-tip="acks:${v}" role="button" tabindex="0" aria-pressed="${on}" aria-label="Producer acks=${v}">
+      <rect x="${x}" y="${ay + 7}" width="26" height="24" rx="6"/><text x="${x + 13}" y="${ay + 23}" text-anchor="middle">${v}</text></g>`;
+  });
+  s += '</g>';
+  // brokers: one switch per broker, with how many partitions it leads
+  const room = xR - 12 - tx, cw = Math.min(124, (room - (B - 1) * 8) / B);
+  s += `<g class="zone z-b">`;
+  for (let b = 0; b < B; b++) {
+    const off = down.has(b), x = tx + b * (cw + 8), leads = G.parts.filter(st => st.leader === b).length;
+    s += `<g class="bhead" data-fid="bh-${b}" data-b="${b}" data-tip="broker:${b}" tabindex="0" role="button" aria-pressed="${off}" aria-label="Broker ${b + 1}, ${off ? 'off. Switch it back on' : `on, leads ${pl(leads, 'partition')}. Switch it off`}">
+      <rect class="bchip${off ? ' off' : ''}" x="${x}" y="46" width="${cw}" height="42" rx="8"/>
+      ${icoAt(off ? 'server-off' : 'server-2', x + 10, 59, 16, `rico ${off ? 'off-t' : 'r-b'}`)}
+      <text class="lbl bn${off ? ' off-t' : ''}" x="${x + 32}" y="64">Broker ${b + 1}</text>
+      <text class="muted bs${off ? ' off-t' : ''}" x="${x + 32}" y="79">${off ? 'switched off' : `leads ${leads}`}</text></g>`;
+  }
+  s += '</g>';
+  // headings over the logs and the copies
+  s += `<g aria-hidden="true"><g data-tip="topic">${iconLabel((tx + tEnd) / 2, 28, `Topic ${esc(topic())}`, 'stack-2', 'lbl', 400)}</g>
+    <text class="muted" x="${tx}" y="${top - 12}">older</text><text class="muted" x="${tEnd}" y="${top - 12}" text-anchor="end">newest ▸</text></g>
+    <g class="zone z-b" aria-hidden="true"><text class="muted" x="${rx}" y="${top - 12}">copies</text></g>`;
+  // one row per partition: its log, its copies, and the track to the consumers
+  s += '<g aria-hidden="true">';
+  for (const st of G.parts) {
+    const p = st.p, y = G.rowY(p);
+    s += `<line class="track${st.writable ? '' : ' blocked'}" data-fid="tr-${p}" x1="${tEnd}" y1="${y}" x2="${G.busX(G.gs.length - 1)}" y2="${y}"/>
+      <text class="pl halo${st.writable ? '' : ' bad'}" data-fid="pl-${p}" data-tip="tape:${p}" x="${tx - 14}" y="${y + 4}" text-anchor="middle">P${p}</text>
+      <clipPath id="clip-${p}"><rect x="${tx - 3}" y="${y - 18}" width="${SLOTS * sw + 6}" height="42"/></clipPath>
+      <g class="tape${st.leader === null ? ' offline' : ''}" data-fid="tp-${p}" data-tip="tape:${p}">
+        <rect class="tape-bg${st.writable ? '' : ' blocked'}" x="${tx - 3}" y="${y - 12}" width="${SLOTS * sw + 6}" height="24" rx="6"/>
+        <g clip-path="url(#clip-${p})"><g id="tsl-${p}">${tapeSlots(p)}</g>
+        ${G.gs.map((gr, g) => `<path class="cur g${g}" id="cur-${p}-${g}" d="${curD(y, g)}" transform="translate(${curX(p, g)},0)"/>`).join('')}</g></g>
+      <text class="lag halo" id="lag-${p}" data-tip="tape:${p}" x="${tEnd + 8}" y="${y + 4}">${lagText(p)}</text>`;
+    st.reps.forEach((b, k) => {
+      const r = down.has(b) ? 'X' : b === st.leader ? 'L' : 'F', x = rx + k * 34;
+      s += `<g class="cellg z-b" data-fid="c-${p}-${b}" data-tip="copy:${p}:${b}"><rect class="cell ${r}" id="c-${p}-${b}" x="${x}" y="${y - 10}" width="30" height="20" rx="5"/>
+        <text class="ct ${r}" x="${x + 15}" y="${y + 4}">B${b + 1}</text></g>`;
+    });
+  }
+  s += '</g>';
+  // consumers
+  // Every group gets every message. Each group has its own lane (a vertical line every partition joins) and its own
+  // box with its consumers and settings, so groups never mix. Inside a group, each partition belongs to one consumer.
+  s += `<g class="zone z-c"><g aria-hidden="true" data-tip="groups">${icoAt('users-group', G.cx - 52, 15, 16, 'rico lbl r-c')}<text class="lbl" x="${G.cx - 31}" y="28">${G.multi ? 'Consumer groups' : 'Consumer group'}</text></g>`;
+  G.gs.forEach((gr, g) => {
+    const bx = G.busX(g), y0 = G.gy0[g], bh = G.blockH[g] - 12, bxl = G.cx - 24;
+    const ys = G.parts.map(st => G.rowY(st.p)), cys = Array.from({ length: gr.consumers }, (_, j) => G.cY(g, j));
+    s += `<g class="gx g${g}" aria-hidden="true"><line class="route-c bus g${g}" x1="${bx}" y1="${Math.min(...ys, ...cys)}" x2="${bx}" y2="${Math.max(...ys, ...cys)}"/>
+      ${ys.map(y => `<circle class="jn" cx="${bx}" cy="${y}" r="2.8"/>`).join('')}${cys.map(cy => `<line class="route-c g${g}" x1="${bx}" y1="${cy}" x2="${G.cx - 14}" y2="${cy}"/>`).join('')}</g>`;
+    const name = gr.name.length > 14 ? gr.name.slice(0, 13) + '…' : gr.name, cons = gr.consumers, sp = { fast: '10 ms', normal: '100 ms', slow: '1 s' }[gr.speed];
+    s += `<g class="gbox gx g${g}" data-fid="gb-${g}"><rect class="gframe" x="${bxl}" y="${y0}" width="${996 - 6 - bxl}" height="${bh}" rx="8"/>
+      <g class="gname" data-g="${g}" data-tip="group:${g}" role="button" tabindex="0" aria-pressed="${gFocus === g}" aria-label="Group ${esc(gr.name)}. ${gFocus === g ? 'Show all groups' : 'Highlight only its lines'}">
+        <rect class="gtag" x="${bxl + 8}" y="${y0 + 9}" width="10" height="10" rx="3"/><text class="ghead" x="${bxl + 24}" y="${y0 + 18}">${esc(name)}</text></g>
+      ${gbtn(`cons:${g}:-1`, bxl + 8, y0 + 26, 20, '−', `gctl:cons:${g}`, `Fewer consumers in ${esc(gr.name)}`, cons <= 1)}
+      <text class="gcount" x="${bxl + 41}" y="${y0 + 40}" text-anchor="middle" aria-hidden="true">${cons}</text>
+      ${gbtn(`cons:${g}:1`, bxl + 54, y0 + 26, 20, '+', `gctl:cons:${g}`, `More consumers in ${esc(gr.name)}`, cons >= 8)}
+      ${gbtn(`speed:${g}`, bxl + 82, y0 + 26, 48, sp, `gctl:speed:${g}`, `Time per message in ${esc(gr.name)}: ${sp}. Change it`, false)}</g>`;
+    s += `<g aria-hidden="true">`;
+    for (let j = 0; j < cons; j++) {
+      const idle = j >= P, y = G.cY(g, j);
+      s += `<g class="gx g${g}" data-fid="cs-${g}-${j}" data-tip="cons:${g}:${j}"><circle class="station-c g${g}${idle ? ' idle' : ''}" id="cons-${g}-${j}" cx="${G.cx}" cy="${y}" r="13"/>${icoAt('inbox', G.cx - 8, y - 8, 16, `cic g${g}${idle ? ' idle' : ''}`)}
+        <text x="${G.cx + 20}" y="${y + 4}">Consumer ${j + 1}</text>${idle ? `<text class="muted" x="${G.cx + 20}" y="${y + 18}">idle</text>` : ''}</g>`;
+    }
+    s += '</g>';
+  });
+  s += '</g><g id="ghosts" aria-hidden="true"></g><g id="dots" aria-hidden="true"></g>';
+  map.setAttribute('viewBox', `0 0 1000 ${H}`);
+  map.innerHTML = s;
+  map.dataset.focus = STEPS[step].focus;
+  if (gFocus !== null && gFocus >= G.gs.length) gFocus = null;
+  map.dataset.gf = gFocus === null ? '' : gFocus;
+  map.setAttribute('aria-label', `Producer writes to topic ${topic()}: ${pl(P, 'partition')}, each an append-only log with ${pl(S.rf, 'copy', 'copies')} spread over ${pl(B, 'broker')}, read by ${pl(C, 'consumer')}.`);
+  msgs.forEach(m => { m.el = null; });
+  $('status').textContent = statusText();
+  renderLag(true);
+  flip(prev, oldLeaders);
+  prevSig = `${G.B}|${G.P}|${G.C}|${S.rf}`;
+}
+function statusText() {
+  const ps = G.parts;
+  if (!down.size) return 'Each row is one partition: a log that only grows at its right end. Dashed slots are not yet copied to the other brokers, so consumers cannot read them yet. Switch a broker off above to see what Kafka does.';
+  const names = [...down].sort().map(b => `Broker ${b + 1}`);
+  const off = ps.filter(s => s.leader === null), blocked = ps.filter(s => s.leader !== null && !s.writable), moved = ps.filter(s => s.moved && s.writable);
+  const pn = a => list(a.map(s => 'P' + s.p));
+  let t = `${list(names)} ${down.size > 1 ? 'are' : 'is'} off. `;
+  if (moved.length) t += `${pn(moved)} promoted a copy on another broker to leader and ${moved.length > 1 ? 'keep' : 'keeps'} working. `;
+  if (blocked.length) t += `${pn(blocked)} ${blocked.length > 1 ? 'refuse' : 'refuses'} writes: fewer than ${S.minIsr} copies are online. ` +
+    (S.retries === '0' ? 'The producer does not retry, so those messages fail at once. ' : `The producer retries them until delivery.timeout.ms (${S.deliveryTimeout} s) runs out, then reports an error. `);
+  if (off.length) t += `${pn(off)} ${off.length > 1 ? 'are' : 'is'} offline because every copy is on a broker that is off. Nobody can write or read ${off.length > 1 ? 'them' : 'it'}. `;
+  if (!blocked.length && !off.length) t += 'Every partition still accepts writes.';
+  return t.trim();
+}
+
+/* ---------- Consumer lag ---------- */
+// Lag = messages saved (committed) but not yet handled by a group. A trend over the last few seconds tells
+// a passing burst (normal) from a group that cannot keep up (needs a fix).
+const lagHist = [];
+let lagSig = '', lagOpen = false;
+const groupLag = g => logs.reduce((a, L) => a + Math.max(0, L.hw - (L.cons[g] ?? L.hw)), 0);
+function sampleLag() {
+  G.gs.forEach((_, g) => { const h = lagHist[g] = lagHist[g] || []; h.push(groupLag(g)); if (h.length > 6) h.shift(); });
+  lagHist.length = G.gs.length;
+  renderLag();
+  // keep an open tooltip's live numbers (offsets, lag) current
+  if (tipEl && !tip.hidden && tipEl.isConnected) { const t = tipText(tipEl.dataset.tip); if (t) tip.innerHTML = `<b>${t[0]}</b>${t[1]}`; }
+}
+function lagTrend(g) {
+  if (!running) return 'paused';
+  const h = lagHist[g] || []; if (h.length < 4) return 'steady';
+  const d = h[h.length - 1] - h[0];
+  return d >= 4 ? 'growing' : d <= -4 ? 'shrinking' : 'steady';
+}
+function lagFixes(g) {
+  const gr = G.gs[g], P = G.P, f = [];
+  if (gr.consumers < P) f.push({ id: `cons:${g}`, btn: 'Add a consumer', text: `Add consumers to “${esc(gr.name)}”. It has ${pl(gr.consumers, 'consumer')} for ${pl(P, 'partition')}, so each one reads about ${Math.ceil(P / gr.consumers)} of them. Up to ${P} can work at once.` });
+  else f.push({ id: 'parts', btn: 'Add a partition', off: P >= 12, text: `Every partition already has its own consumer in “${esc(gr.name)}”, so more consumers would sit idle. Add partitions, then add consumers to match.` });
+  if (gr.speed !== 'fast') f.push({ id: `fast:${g}`, btn: 'Make handling faster', text: `Make each message cheaper to handle (now ${SPEED[gr.speed].label.toLowerCase()}): write to the database in batches, call slow services asynchronously, and cache lookups.` });
+  return f;
+}
+function renderLag(force) {
+  const box = $('lagbox'); if (!box || !G) return;
+  const gs = G.gs, lag = gs.map((_, g) => groupLag(g)), tr = gs.map((_, g) => lagTrend(g));
+  // the group that most needs help: growing lag first, then a large one
+  const worst = tr.indexOf('growing') >= 0 ? tr.indexOf('growing') : lag.findIndex((v, g) => v > 25 && tr[g] === 'steady');
+  const catching = gs.map((gr, g) => tr[g] === 'shrinking' && lag[g] > 0 ? gr.name : null).filter(Boolean);
+  const offline = G.parts.some(st => st.leader === null);
+  const sig = [gs.map(g => g.name).join(), tr.join(), worst, catching.join(), worst >= 0 ? lagFixes(worst).map(f => f.id + f.off).join() : '', offline].join('|');
+  if (force || sig !== lagSig) {
+    lagSig = sig;
+    const arrow = { growing: '↗ growing', shrinking: '↘ shrinking', steady: '→ steady', paused: 'paused' };
+    box.innerHTML = `<div class="lag-head">${ic('route')}<b>Consumer lag</b><span>messages saved but not yet handled</span></div>
+      <ul class="lag-groups">${gs.map((gr, g) => `<li class="g${g}" data-tip="group:${g}"><i aria-hidden="true"></i><span class="lgn">${esc(gr.name)}</span><b id="lagv-${g}">${lag[g]}</b><span class="trend t-${tr[g]}">${arrow[tr[g]]}</span></li>`).join('')}</ul>` +
+      (worst >= 0 ? `<div class="lag-fix"><p><b>${tr[worst] === 'growing' ? `Lag in “${esc(gs[worst].name)}” keeps growing.` : `“${esc(gs[worst].name)}” is far behind.`}</b> Its consumers handle fewer messages per second than the producers send. Try one of these, then watch the number:</p>
+        <ol>${lagFixes(worst).map(f => `<li><span>${f.text}</span><button type="button" class="btn" data-lagfix="${f.id}"${f.off ? ' disabled' : ''}>${ic('plus')}${f.btn}</button></li>`).join('')}</ol></div>`
+        : `<p class="lag-ok">${!running ? 'Play the animation to watch lag change.' : catching.length ? `${list(catching.map(n => `“${esc(n)}”`))} ${catching.length > 1 ? 'are' : 'is'} catching up: its consumers now handle more messages per second than the producers send.` : 'Lag rises with each burst and drops back. That is normal: consumers are keeping up.'}</p>`) +
+      (offline ? `<p class="lag-ok">Partitions without a leader cannot be read, so their lag stays frozen until a broker comes back.</p>` : '') +
+      `<details class="lag-more"${lagOpen ? ' open' : ''}><summary>How do I fix lag in production?</summary><ul>
+        <li><b>Measure it.</b> <code>kafka-consumer-groups.sh --bootstrap-server ${esc(hostList(9092)[0])} --describe --group ${esc(gs[0].name)}</code> shows a LAG column per partition. Consumers also report <code>records-lag-max</code>.</li>
+        <li><b>Lag that rises and falls is fine.</b> Act when it keeps growing: the group handles fewer messages per second than the producers send.</li>
+        <li><b>Do the math.</b> One consumer handles about 1000 ÷ (ms per message) messages a second. Consumers needed ≈ messages per second sent ÷ that number.</li>
+        <li><b>Add consumers,</b> up to one per partition. Beyond that, extra consumers sit idle.</li>
+        <li><b>Add partitions</b> when every partition already has a consumer. Keys then move to new partitions, so their order holds only from that point on.</li>
+        <li><b>Make handling faster:</b> batch database writes, do slow calls asynchronously, cache lookups. Bigger <code>max.poll.records</code> or <code>fetch.min.bytes</code> only help when each message is cheap.</li>
+        <li><b>Give slow work its own group,</b> so it never holds back fast readers. Each group keeps its own position.</li>
+        <li><b>Only need new data?</b> A new group can start from now on (<code>auto.offset.reset=latest</code>), or you can reset a group's offsets to skip a backlog you do not need.</li></ul></details>`;
+    box.querySelector('details').addEventListener('toggle', e => { lagOpen = e.target.open; });
+  } else gs.forEach((_, g) => { const v = $(`lagv-${g}`); if (v) v.textContent = lag[g]; });
+}
+function lagFix(id) {
+  const [a, gs] = id.split(':'), g = Number(gs), faster = { slow: 'normal', normal: 'fast', fast: 'fast' };
+  const gr = g > 0 ? S.more[g - 1] : null;
+  if (a === 'cons') { if (gr) gr.consumers = Math.min(8, gr.consumers + 1); else S.consumers = Math.min(8, S.consumers + 1); }
+  if (a === 'parts') S.partitions = Math.min(12, S.partitions + 1);
+  if (a === 'fast') { if (gr) gr.speed = faster[gr.speed]; else S.speed = faster[S.speed]; }
+  normalize(); save(); lagHist.length = 0; renderAll();
+  announce('Changed. Watch the lag number.');
+  const again = document.querySelector(`[data-lagfix="${id}"]`); if (again && !again.disabled) again.focus(); else $('lagbox').focus();
+}
+
+/* ---------- Animation ---------- */
+let msgs = [], running = !reduce, lastSpawn = 0, rr = 0, rp0 = 0, busy = {}, lastLagT = 0;
+function along(a, f) {
+  f = clamp(f, 0, 1);
+  const seg = []; let L = 0;
+  for (let i = 1; i < a.length; i++) { const d = Math.hypot(a[i][0] - a[i - 1][0], a[i][1] - a[i - 1][1]); seg.push(d); L += d; }
+  let r = f * L;
+  for (let i = 0; i < seg.length; i++) {
+    if (r <= seg[i] || i === seg.length - 1) { const u = seg[i] ? Math.min(1, r / seg[i]) : 1; return [a[i][0] + (a[i + 1][0] - a[i][0]) * u, a[i][1] + (a[i + 1][1] - a[i][1]) * u]; }
+    r -= seg[i];
+  }
+  return a[a.length - 1];
+}
+// Why a reply travels back to the producer, in Kafka's own terms.
+// Only one message carries an explanation at a time, so the labels never pile up.
+let lastNote = 0;
+const noteFree = now => now - lastNote > 1400 && !msgs.some(m => m.note && !m.dead);
+function replyNote(kind, st, now) {
+  if (!noteFree(now)) return '';
+  lastNote = now;
+  if (kind === 'ack') return S.acks === '1' ? 'ack: leader saved it' : `ack: ${st.alive.length} of ${S.rf} copies saved`;
+  if (st.leader === null) return 'error: no leader, every copy is off';
+  return `error: NOT_ENOUGH_REPLICAS (${st.alive.length} of ${S.minIsr} needed)`;
+}
+const ease = f => f < .5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
+function spawn(now) {
+  // Keyed messages always go to their own partition, even when it is offline
+  if (S.keys.length && Math.random() < (S.hotKey ? .8 : .45)) {
+    const key = S.hotKey ? S.keys[0] : S.keys[rk++ % S.keys.length];
+    msgs.push({ kind: 'msg', p: partitionFor(key), key, src: Math.floor(Math.random() * G.N), t0: now, phase: 'out', first: true });
+    return;
+  }
+  const ok = G.parts.filter(s => s.leader !== null);
+  if (!ok.length) return;
+  const p = ok[rr++ % ok.length].p;
+  const k = S.linger ? Math.min(5, 1 + Math.ceil(S.linger / 25)) : 1;
+  const src = Math.floor(Math.random() * G.N);
+  for (let i = 0; i < k; i++) msgs.push({ kind: 'msg', p, src, t0: now + i * 85, phase: 'out', first: i === 0 });
+}
+// Each consumer handles one message at a time and takes turns between the partitions it owns,
+// so a consumer with more partitions falls further behind (its lag grows)
+// Each consumer handles one message at a time, taking turns between the partitions it owns. A group whose
+// consumers are slower than the producers falls behind: its lag grows.
+function readStep(now) {
+  G.gs.forEach((gr, g) => {
+    for (let n = 0; n < G.P; n++) {
+      const p = (rp0 + n) % G.P, L = logs[p], key = g + ':' + (p % gr.consumers);
+      if (L.pos[g] >= L.hw || G.parts[p].leader === null || (busy[key] || 0) > now) continue;
+      busy[key] = now + SPEED[gr.speed].gap;
+      msgs.push({ kind: 'read', p, g, off: L.pos[g]++, t0: now });
+    }
+  });
+  rp0++;
+}
+function pulse(el, cls, ms) { if (!el) return; el.classList.add(cls); setTimeout(() => el.classList.remove(cls), ms); }
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (!running || !G || !introDone) return;
+  // more producers send more often
+  if (now - lastSpawn > (700 + S.linger * 7) / G.N && msgs.length < 320) { lastSpawn = now; spawn(now); }
+  readStep(now);
+  if (now - lastLagT > 1000) { lastLagT = now; sampleLag(); }
+  const layer = $('dots'); if (!layer) return;
+  for (const m of msgs) {
+    if (m.p >= G.P) { m.dead = true; continue; }
+    const st = G.parts[m.p], L = logs[m.p], t = now - m.t0;
+    let pos = null;
+    // a commit is invisible: the high watermark moves once the in-sync copies have the message
+    if (m.kind === 'commit') {
+      if (t < 0) continue;
+      m.dead = true;
+      if (st.leader !== null) { L.hw = Math.max(L.hw, m.off + 1); updateTape(m.p); }
+      if (m.first && S.acks === 'all' && st.writable) msgs.push({ kind: 'ack', p: m.p, src: m.src, t0: now, note: replyNote('ack', st, now) });
+      continue;
+    }
+    if (t < 0) pos = null;
+    else if (m.kind === 'msg') {
+      if (t >= 1000) {
+        if (!st.writable) { m.kind = 'err'; m.t0 = now; m.note = ''; if (m.first) m.note = replyNote('err', st, now); if (m.el) { m.el.remove(); m.el = null; } pos = outPath(m.p, m.src).at(-1); }
+        else {
+          // the leader appends it to the end of the log; it counts as committed once the in-sync copies have it
+          m.dead = true; L.leo++; updateTape(m.p, true);
+          const followers = st.alive.filter(b => b !== st.leader);
+          if (m.first) for (const b of followers) msgs.push({ kind: 'rep', p: m.p, to: b, from: st.leader, t0: now });
+          msgs.push({ kind: 'commit', p: m.p, src: m.src, off: L.leo - 1, first: m.first, t0: now + (followers.length ? 650 : 0) });
+          if (m.first && S.acks === '1') msgs.push({ kind: 'ack', p: m.p, src: m.src, t0: now, note: replyNote('ack', st, now) });
+          continue;
+        }
+      } else pos = along(outPath(m.p, m.src), ease(t / 1000));
+    } else if (m.kind === 'read') {
+      // if the partition loses its leader mid-read, the group fetches that message again later
+      if (st.leader === null || m.g >= G.gs.length) { m.dead = true; if (m.g < L.pos.length) L.pos[m.g] = Math.min(L.pos[m.g], m.off); continue; }
+      if (t >= 900) {
+        m.dead = true; L.cons[m.g] = Math.max(L.cons[m.g], m.off + 1); updateTape(m.p);
+        pulse($(`cons-${m.g}-${m.p % G.gs[m.g].consumers}`), 'hit', 220); continue;
+      }
+      pos = along(readPath(m.p, m.off, m.g), ease(t / 900));
+    } else if (m.kind === 'err') {
+      if (t >= 800) {
+        m.dead = true;
+        if (m.first) {
+          const att = m.attempt || 1;
+          if (S.retries !== '0' && att < Math.min(retryPlan().tries, 4))
+            msgs.push({ kind: 'msg', p: m.p, key: m.key, src: m.src, t0: now + Math.min(700, 200 + S.retryBackoff * 2 ** (att - 1) / 2), phase: 'out', first: true, attempt: att + 1, note: noteFree(now) ? (lastNote = now, `retry ${att} after ${fmtS(S.retryBackoff * 2 ** (att - 1))}`) : '' });
+          else pulse($('prod-' + (m.src || 0)), 'fail', 600);
+        }
+        continue;
+      }
+      pos = along(outPath(m.p, m.src).reverse(), ease(t / 800));
+    } else if (m.kind === 'ack') {
+      if (t >= 950) { m.dead = true; continue; }
+      pos = along(outPath(m.p, m.src).reverse(), ease(t / 950));
+    } else if (m.kind === 'rep') {
+      if (t >= 600) { m.dead = true; pulse($(`c-${m.p}-${m.to}`), 'got', 380); continue; }
+      const y = G.rowY(m.p);
+      pos = along([[G.chipX(m.p, m.from), y], [G.chipX(m.p, m.to), y]], ease(t / 600));
+    }
+    if (m.dead) continue;
+    if (!m.el || !m.el.isConnected) {
+      m.el = document.createElementNS(NS, 'g');
+      m.el.appendChild(document.createElementNS(NS, 'circle'));
+      if (m.key) {
+        const tx = document.createElementNS(NS, 'text');
+        tx.setAttribute('class', 'keylbl halo'); tx.setAttribute('y', -9); tx.setAttribute('text-anchor', 'middle');
+        tx.textContent = m.key; m.el.appendChild(tx);
+      }
+      if (m.note) {
+        const tx = document.createElementNS(NS, 'text');
+        tx.setAttribute('class', `retlbl halo ${m.kind === 'msg' ? 'try' : m.kind}`); tx.setAttribute('x', -12); tx.setAttribute('y', 17);
+        tx.textContent = m.note; m.el.appendChild(tx);
+      }
+      layer.appendChild(m.el);
+    }
+    const dot = m.el.firstChild;
+    dot.setAttribute('class', 'dot ' + (m.kind === 'msg' ? '' : m.kind === 'read' ? 'read g' + m.g : m.kind));
+    dot.setAttribute('r', m.kind === 'ack' ? 4 : m.kind === 'rep' ? 3.6 : m.kind === 'read' ? 4.2 : S.compression === 'none' ? 5.2 : 3.8);
+    if (pos) { m.el.setAttribute('transform', `translate(${pos[0]},${pos[1]})`); m.el.style.display = ''; }
+    else m.el.style.display = 'none';
+  }
+  msgs = msgs.filter(m => { if (m.dead && m.el) m.el.remove(); return !m.dead; });
+}
+
+$('explain').addEventListener('input', e => {
+  if (e.target.id !== 'hash-try') return;
+  const v = e.target.value.trim().slice(0, 40), out = $('hash-out');
+  out.innerHTML = v ? hashLine(v) : '';
+});
+
+/* ---------- Tooltips ---------- */
+// Every part of the pipeline explains itself on hover or keyboard focus. The text is built when it is shown,
+// so it always matches the live diagram (offsets, lag, which consumer owns which partition).
+function tipText(key) {
+  const [k, a, b] = key.split(':'), n = Number(a), gs = G ? G.gs : groupList();
+  const wait = { '0': 'never waits for a reply', '1': 'waits until the partition leader saved it', all: 'waits until every in-sync copy saved it' }[S.acks];
+  switch (k) {
+    case 'prod': return ['Producer', `Your app's Kafka client. It sends each message to the topic and ${wait} (acks=${S.acks}).${S.producers > 1 ? ` ${S.producers} apps send to the same partitions.` : ''}`];
+    case 'acks': return [`acks=${a}`, { '0': 'Don’t wait for any reply. Fastest, but a lost message goes unnoticed.', '1': 'Wait until the partition leader has saved the message. If the leader crashes before the followers copy it, it is lost.', all: 'Wait until every in-sync copy has saved the message. Safest: writes are refused when too few copies are online.' }[a]];
+    case 'part': return [`hash % ${S.partitions}`, `How Kafka picks a partition for a message with a key. <em>hash</em> turns the key into a big number (the murmur2 function; the same key always gives the same number). <em>%</em> means “the remainder after dividing”: dividing by ${S.partitions} leaves 0 to ${S.partitions - 1}, and that remainder is the partition number. Click for a worked example.`];
+    case 'topic': return [`Topic ${esc(topic())}`, `A named stream of messages, split into ${pl(S.partitions, 'partition')} so several brokers and consumers can share the work. Messages are kept for ${pl(S.retention, 'day')}, even after they are read.`];
+    case 'broker': {
+      const leads = G.parts.filter(st => st.leader === n).length, holds = G.parts.filter(st => st.reps.includes(n)).length;
+      return [`Broker ${n + 1}`, down.has(n) ? 'Switched off. Partitions that had a copy elsewhere moved their leader to another broker. Click to switch it back on.'
+        : `A Kafka server. It holds ${pl(holds, 'partition copy', 'partition copies')} and leads ${leads} of them. Click to switch it off and see what Kafka does.`];
+    }
+    case 'tape': {
+      const st = G.parts[n], L = logs[n]; if (!st || !L) return null;
+      const where = st.leader === null ? 'It has no leader: every copy is on a broker that is off, so nobody can write or read it.' : `Broker ${st.leader + 1} leads it.`;
+      const reads = gs.map((gr, g) => `${esc(gr.name)} has read up to offset ${L.cons[g] - 1} (lag ${Math.max(0, L.hw - L.cons[g])})`).join('; ');
+      return [`Partition P${n}`, `An append-only log. Each new message gets the next number (offset) at the right end; the next one is ${L.leo}. ${where} Solid slots are copied to every in-sync copy; dashed ones are not yet, so nobody can read them. ${reads}.`];
+    }
+    case 'copy': {
+      const st = G.parts[n], bk = Number(b); if (!st) return null;
+      const role = down.has(bk) ? 'Offline: this broker is switched off.' : bk === st.leader ? 'Leader copy: takes every write and read for this partition.' : 'Follower copy: keeps copying the leader, ready to take over if the leader’s broker fails.';
+      return [`P${n} on Broker ${bk + 1}`, role];
+    }
+    case 'cons': {
+      const gr = gs[n], j = Number(b); if (!gr) return null;
+      const mine = Array.from({ length: S.partitions }, (_, p) => p).filter(p => p % gr.consumers === j);
+      return [`Consumer ${j + 1} · ${esc(gr.name)}`, j >= S.partitions ? 'Idle: the group has more consumers than partitions, so nothing is left for this one.'
+        : `Reads ${list(mine.map(p => 'P' + p))}. Handles about ${Math.round(1000 / SPEED[gr.speed].ms)} messages a second (${SPEED[gr.speed].label.toLowerCase()} each), then commits its position.`];
+    }
+    case 'group': {
+      const gr = gs[n]; if (!gr) return null;
+      return [`Group ${esc(gr.name)}`, `Gets its own copy of every message and keeps its own read position (offset) in each partition. Its ${pl(gr.consumers, 'consumer')} split the ${pl(S.partitions, 'partition')}. Lag now: ${G ? groupLag(n) : 0}. Click its name to highlight only its lines.`];
+    }
+    case 'gctl': {
+      const gr = gs[Number(b)]; if (!gr) return null;
+      return a === 'cons' ? [`Consumers in ${esc(gr.name)}: ${gr.consumers}`, `Use − and + to change. Up to ${S.partitions} can work at once, one per partition; more sit idle.`]
+        : [`Time per message in ${esc(gr.name)}`, `Now ${SPEED[gr.speed].label.toLowerCase()}, so one consumer handles about ${Math.round(1000 / SPEED[gr.speed].ms)} messages a second. Click to switch between 10 ms, 100 ms and 1 s.`];
+    }
+    case 'groups': return ['Consumer groups', 'Each group reads every message on its own and keeps its own position, so a slow group never holds back a fast one. Inside a group, each partition is read by exactly one consumer.'];
+    case 'leg': return {
+      prod: ['Producer', 'Your app writing messages to the topic.'], 'role-broker': ['Broker', 'A Kafka server that stores copies of partitions.'],
+      'role-consumer': ['Consumer', 'Your service reading messages. Consumers with the same group name split the partitions.'],
+      leader: ['Leader copy', 'The copy of a partition that takes every write and read.'], follower: ['Follower copy', 'A copy that keeps up with the leader and takes over if its broker fails.'],
+      saved: ['Saved message', 'Stored on every in-sync copy (below the high watermark). Consumers can read it. Faded once every group has read it.'],
+      new: ['Not copied yet', 'Saved on the leader but not yet on every in-sync copy. Consumers cannot read it until it is.'],
+      cursor: ['Read position', 'Where a consumer group has read up to in this partition (its committed offset). Each group has its own.'],
+      msg: ['Message', 'A message travelling from a producer to its partition.'], ack: ['Confirmation (ack)', 'The broker telling the producer that a message is saved.'],
+      err: ['Refused write (error)', 'The broker refusing a message, for example when too few copies are online. The producer retries.'] }[a];
+    case 'bar': return {
+      goal: ['Kind of data', 'Fills in sensible settings for every step. You can still change each one.'],
+      producers: ['Producers', 'Apps sending to this topic. More producers send more messages per second.'],
+      brokers: ['Brokers', 'Kafka servers. More brokers spread the partitions and allow more copies.'],
+      partitions: ['Partitions', 'How many logs the topic is split into. More partitions let more consumers work at once.'],
+      rf: ['Copies', 'Copies of each partition (replication.factor), at most one per broker. More copies survive more broker failures.'],
+      consumers: ['Consumers', `Consumers in group ${esc(group())}. Up to one per partition does work; the rest sit idle.`],
+      groups: ['Consumer groups', 'Separate services reading the same topic. Each group gets every message.'] }[a];
+  }
+  return null;
+}
+const tip = $('tip');
+let tipEl = null, tipTimer = 0, tipByFocus = false, tipNext = null;
+function placeTip(x, y) {
+  const r = tip.getBoundingClientRect();
+  let left = x + 14, top = y + 18;
+  if (left + r.width > innerWidth - 8) left = Math.max(8, x - r.width - 14);
+  if (top + r.height > innerHeight - 8) top = Math.max(8, y - r.height - 14);
+  tip.style.left = left + 'px'; tip.style.top = top + 'px';
+}
+function showTip(el, x, y) {
+  const t = tipText(el.dataset.tip); if (!t) return;
+  tip.innerHTML = `<b>${t[0]}</b>${t[1]}`; tip.hidden = false; tipEl = el;
+  placeTip(x, y);
+}
+function hideTip() { clearTimeout(tipTimer); tip.hidden = true; tipByFocus = false; tipNext = null; if (tipEl) tipEl.removeAttribute('aria-describedby'); tipEl = null; }
+document.addEventListener('pointerover', e => {
+  const el = e.target.closest && e.target.closest('[data-tip]');
+  // the logs slide under a still pointer, so moving between parts of the same item must not restart the delay
+  if (el && (el === tipEl || el === tipNext)) return;
+  if (!el) { hideTip(); return; }
+  clearTimeout(tipTimer); tipNext = el;
+  const x = e.clientX, y = e.clientY, quick = !tip.hidden;
+  tipTimer = setTimeout(() => { tipNext = null; showTip(el, x, y); }, quick ? 0 : 200);
+});
+document.addEventListener('pointermove', e => {
+  if (!tipEl) return;
+  if (!tipEl.isConnected) { hideTip(); return; }
+  placeTip(e.clientX, e.clientY);
+});
+document.addEventListener('focusin', e => {
+  const el = e.target.closest && e.target.closest('[data-tip]');
+  if (!el || !e.target.matches(':focus-visible')) { hideTip(); return; }
+  const r = el.getBoundingClientRect();
+  showTip(el, r.left, r.bottom - 10); el.setAttribute('aria-describedby', 'tip'); tipByFocus = true;
+});
+document.addEventListener('focusout', hideTip);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') hideTip(); });
+// a tooltip opened by the mouse closes on scroll; one opened by keyboard focus follows its element
+addEventListener('scroll', () => {
+  if (tipByFocus && tipEl && tipEl.isConnected) { const r = tipEl.getBoundingClientRect(); placeTip(r.left, r.bottom - 10); } else hideTip();
+}, { passive: true });
+
+/* ---------- Render & events ---------- */
+const map = $('map'), controls = $('controls'), work = $('work');
+// The bar above the diagram: pick a kind of data, or add and remove producers, brokers, partitions, copies and consumers
+const BAR = [['producers', 'app-window', 'Producers', 'r-p', () => 5], ['brokers', 'server-2', 'Brokers', 'r-b', () => 5],
+  ['partitions', 'stack-2', 'Partitions', '', () => 12], ['rf', 'copy', 'Copies', 'r-b', () => S.brokers], ['consumers', 'inbox', 'Consumers', 'r-c', () => 8]];
+function renderBar() {
+  const bar = $('pbar'), f = bar.contains(document.activeElement) ? document.activeElement.id : null;
+  const sel = `<label class="pselect" data-tip="bar:goal">${ic('target-arrow')}<span class="sr">Kind of data</span><select id="pb-goal" data-k="goal">${Object.entries(PRESETS).map(([v, p]) =>
+    `<option value="${v}"${v === S.goal ? ' selected' : ''}>${p.label}${v === S.goal && isCustom() ? ' (changed)' : ''}</option>`).join('')}</select></label>`;
+  const g = $('pgoal'), gf = g.contains(document.activeElement);
+  g.innerHTML = sel; if (gf) $('pb-goal').focus();
+  bar.innerHTML = BAR.map(([k, icon, label, cls, max]) => `<div class="pcount" role="group" aria-label="${label}" data-tip="bar:${k}">${ic(icon).replace('class="ic"', `class="ic ${cls || 'r-n'}"`)}<span class="pct ${cls}">${label}</span>
+      <button type="button" id="pb-${k}-dec" data-step="${k}" data-d="-1" aria-label="Fewer ${label.toLowerCase()}"${S[k] <= 1 ? ' disabled' : ''}>${ic('minus', 14)}</button>
+      <output>${S[k]}</output>
+      <button type="button" id="pb-${k}-inc" data-step="${k}" data-d="1" aria-label="More ${label.toLowerCase()}"${S[k] >= max() ? ' disabled' : ''}>${ic('plus', 14)}</button></div>`).join('') +
+    `<div class="pcount" role="group" aria-label="Consumer groups" data-tip="bar:groups">${ic('users-group').replace('class="ic"', 'class="ic r-c"')}<span class="pct">Groups</span>
+      <button type="button" id="pb-groups-dec" data-gcount="-1" aria-label="Fewer consumer groups"${S.more.length ? '' : ' disabled'}>${ic('minus', 14)}</button>
+      <output>${1 + S.more.length}</output>
+      <button type="button" id="pb-groups-inc" data-gcount="1" aria-label="More consumer groups"${S.more.length >= 2 ? ' disabled' : ''}>${ic('plus', 14)}</button></div>`;
+  if (f) { const el = $(f); if (el && !el.disabled) el.focus(); else { const o = $(f.replace(/-(dec|inc)$/, f.endsWith('-dec') ? '-inc' : '-dec')); o && o.focus(); } }
+}
+$('pgoal').addEventListener('change', e => { if (e.target.id === 'pb-goal') { set('goal', e.target.value); $('pb-goal').focus(); } });
+function renderNav() {
+  renderBar();
+  const w = checks();
+  // the header pill counts the same warnings as the step badges, so it refreshes with them
+  const warns = w.filter(c => c.lvl === 'warn').length, pill = $('crumb-pill');
+  $('crumb-step').textContent = `Step ${step + 1} of ${STEPS.length} · ${STEPS[step].name}`;
+  pill.classList.toggle('warn', warns > 0);
+  pill.lastElementChild.textContent = warns ? pl(warns, 'warning') : 'No warnings';
+  $('steps').innerHTML = STEPS.map((s, i) => {
+    const n = w.filter(c => c.step === i && c.lvl === 'warn').length;
+    const c = `var(--${s.role})`;
+    return `<li><button type="button" data-goto="${i}" style="--c:${c}"${i === step ? ' aria-current="step"' : ''}>
+      <span class="n">${i + 1}</span><span class="si">${ic(s.icon)}</span><span class="name">${s.name}</span>${n ? `<span class="badge" aria-label="${pl(n, 'warning')}">${n}</span>` : ''}</button></li>`;
+  }).join('');
+}
+function renderControls() {
+  const f = document.activeElement && controls.contains(document.activeElement) ? document.activeElement.id : null;
+  controls.innerHTML = controlsHtml();
+  if (f) { const el = $(f); if (el && !el.disabled) el.focus(); else if (f.endsWith('-dec') || f.endsWith('-inc')) { const o = $(f.replace(/-(dec|inc)$/, f.endsWith('-dec') ? '-inc' : '-dec')); o && o.focus(); } }
+}
+// Timeline and chart shapes keep their identity between renders, so a slider drag reshapes them in place
+const ATTRS = ['x', 'y', 'width', 'height', 'x1', 'x2', 'cx'];
+function snapAttrs(root) {
+  const m = new Map();
+  root.querySelectorAll('.tl [data-fid]').forEach(el => {
+    const a = {}; ATTRS.forEach(n => { if (el.hasAttribute(n)) a[n] = parseFloat(el.getAttribute(n)); });
+    m.set(el.dataset.fid, a);
+  });
+  return m;
+}
+function morphAttrs(root, prev) {
+  if (!motionOK() || !prev.size) return;
+  root.querySelectorAll('.tl [data-fid]').forEach(el => {
+    const o = prev.get(el.dataset.fid);
+    if (!o) { gsap.from(el, { opacity: 0, duration: M.base }); return; }
+    const from = {};
+    for (const k in o) if (Math.abs(parseFloat(el.getAttribute(k)) - o[k]) > .3) from[k] = o[k];
+    if (Object.keys(from).length) gsap.from(el, { attr: from, duration: M.base, ease: M.ease });
+  });
+}
+function renderSide() {
+  const files = STEPS[step].id === 'files', ex = $('explain');
+  work.classList.toggle('wide', files);
+  ex.hidden = files;
+  if (files) return;
+  const prev = motionOK() ? snapAttrs(ex) : new Map();
+  ex.innerHTML = explainHtml();
+  morphAttrs(ex, prev);
+}
+// One indicator slides along the step rail instead of each step lighting up on its own
+const sidebar = matchMedia('(min-width: 1024px)');
+function moveRail(animate) {
+  const rail = $('rail'), btn = document.querySelector('.steps button[aria-current="step"]');
+  if (!rail || !btn) return;
+  const n = rail.parentElement.getBoundingClientRect(), b = btn.getBoundingClientRect();
+  rail.style.background = `var(--${STEPS[step].role})`;
+  if (!window.gsap) return;
+  // A vertical bar beside the sidebar list, a bar along the top of the row of tabs on narrow screens
+  const to = sidebar.matches ? { x: 0, y: b.top - n.top, width: 2, height: b.height } : { x: b.left - n.left, y: 0, width: b.width, height: 3 };
+  gsap.to(rail, { ...to, duration: animate && motionOK() ? M.slow : 0, ease: 'power3.inOut', overwrite: true });
+}
+function renderAll() {
+  work.dataset.role = STEPS[step].role;
+  renderNav(); renderControls(); renderSide(); drawMap();
+  $('back').disabled = step === 0;
+  $('next').innerHTML = step < STEPS.length - 1 ? `Next: ${STEPS[step + 1].name}${ic('arrow-right')}` : ic('refresh') + 'Start over';
+}
+function go(i) {
+  const dir = Math.sign(clamp(i, 0, STEPS.length - 1) - step) || 1;
+  step = clamp(i, 0, STEPS.length - 1);
+  keyMsg = '';
+  try { history.replaceState(null, '', '#' + STEPS[step].id); } catch (e) {}
+  renderAll();
+  moveRail(true);
+  // The new step slides in from the side you are moving toward
+  if (motionOK()) gsap.fromTo([controls, $('explain')], { opacity: 0, x: 18 * dir }, { opacity: 1, x: 0, duration: M.base, ease: M.ease, stagger: .05, clearProps: 'opacity,transform', overwrite: true });
+  // Bring the diagram back into view; the sidebar itself never scrolls away
+  const nav = document.querySelector(sidebar.matches ? '.stage' : '.steps');
+  if (nav.getBoundingClientRect().top < 0) nav.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
+  const h = $('step-h'); if (h) h.focus({ preventScroll: true });
+}
+function set(k, v, light) {
+  if (typeof S[k] === 'number') v = Number(v);
+  else if (typeof S[k] === 'boolean') v = v === true || v === 'true';
+  S[k] = v;
+  if (k === 'goal') PKEYS.forEach(p => { S[p] = PRESETS[v][p]; });
+  normalize(); save();
+  if (light) { renderNav(); renderSide(); drawMap(); }
+  else { renderNav(); renderControls(); renderSide(); drawMap(); }
+}
+
+function addKey() {
+  const inp = $('newKey'), v = inp ? inp.value.trim().slice(0, 40) : '';
+  if (!v) keyMsg = 'Type a key first, for example order-1001.';
+  else if (S.keys.includes(v)) keyMsg = `${v} is already in the list. It goes to P${partitionFor(v)}.`;
+  else if (S.keys.length >= 6) keyMsg = 'You can try up to 6 keys. Remove one to add another.';
+  else { S.keys = [...S.keys, v]; keyMsg = `Added ${v}. It goes to P${partitionFor(v)}.`; save(); }
+  const added = keyMsg.startsWith('Added'), keep = added ? '' : v;
+  renderAll();
+  const again = $('newKey'); if (again) { again.value = keep; again.focus(); }
+  const chips = document.querySelectorAll('.chip');
+  if (added && chips.length && motionOK()) gsap.from(chips[chips.length - 1], { scale: .5, opacity: 0, duration: M.base, ease: M.pop });
+}
+controls.addEventListener('change', e => {
+  if (['topic', 'host', 'group'].includes(e.target.id)) { touched.add(e.target.id); updateFieldErrors(); }
+});
+controls.addEventListener('keydown', e => {
+  if (e.target.id === 'newKey' && e.key === 'Enter') { e.preventDefault(); addKey(); }
+});
+controls.addEventListener('input', e => {
+  const el = e.target, k = el.dataset.k;
+  if (el.id === 'importText') { importText = el.value; return; }
+  if (el.dataset.gname !== undefined) { S.more[+el.dataset.gname].name = el.value.slice(0, 60); save(); renderNav(); renderSide(); drawMap(); return; }
+  if (el.dataset.gspeed !== undefined) { S.more[+el.dataset.gspeed].speed = el.value; save(); lagHist.length = 0; renderNav(); renderSide(); drawMap(); return; }
+  if (!k) return;
+  if (el.type === 'text') { set(k, el.value, true); updateFieldErrors(); return; }
+  if (el.type === 'range') {
+    set(k, el.value, true);
+    // Keep every slider in step with the state (one setting can raise another)
+    controls.querySelectorAll('input[type=range]').forEach(r => { r.value = S[r.dataset.k]; $(r.dataset.k + '-out').textContent = `${S[r.dataset.k]} ${r.dataset.fmt}`; });
+  }
+  else if (el.type === 'text') set(k, el.value, true);
+  else if (el.type === 'checkbox') set(k, el.checked);
+  else if (el.type === 'radio') set(k, el.value);
+});
+document.addEventListener('click', e => {
+  const gst = e.target.closest('[data-gstep]');
+  if (gst) { const gr = S.more[+gst.dataset.gstep]; gr.consumers = clamp(gr.consumers + Number(gst.dataset.d), 1, 8); normalize(); save(); renderAll(); return; }
+  if (e.target.closest('[data-gadd]')) { addGroup(); const f = $(`gname-${S.more.length - 1}`); f && f.focus(); return; }
+  const gd = e.target.closest('[data-gdel]');
+  if (gd) { delGroup(+gd.dataset.gdel); const f = $('gadd'); f && f.focus(); return; }
+  const gc = e.target.closest('[data-gcount]');
+  if (gc) { Number(gc.dataset.gcount) > 0 ? addGroup() : delGroup(S.more.length - 1); return; }
+  const lf = e.target.closest('[data-lagfix]');
+  if (lf) { lagFix(lf.dataset.lagfix); return; }
+  const st = e.target.closest('[data-step]');
+  if (st) { set(st.dataset.step, S[st.dataset.step] + Number(st.dataset.d)); return; }
+  const g = e.target.closest('[data-goto]');
+  if (g) { go(Number(g.dataset.goto)); return; }
+  const act = e.target.closest('[data-act]');
+  if (act) {
+    const a = act.dataset.act;
+    if (a === 'addkey') addKey();
+    if (a === 'example') {
+      if (importText.trim() && importText !== EXAMPLE) savedText = importText;
+      importText = EXAMPLE; importReport = null; renderControls(); $('importText').focus();
+    }
+    if (a === 'restore') { importText = savedText || ''; savedText = null; renderControls(); $('importText').focus(); announce('Your text is back.'); }
+    if (a === 'import') {
+      importReport = importConfig(importText);
+      renderAll();
+      const r = $('import-report'); r && r.focus();
+      if (r && motionOK()) gsap.from(r.querySelectorAll('h4, .note, .report > div > b, li, code.key'), { opacity: 0, y: 8, duration: M.base, ease: M.ease, stagger: .045 });
+    }
+    return;
+  }
+  const dk = e.target.closest('[data-delkey]');
+  if (dk) {
+    S.keys.splice(Number(dk.dataset.delkey), 1);
+    normalize(); save(); renderAll();
+    const inp = $('newKey'); inp && inp.focus();
+    return;
+  }
+  const c = e.target.closest('[data-copy]');
+  if (c) {
+    const name = c.dataset.copy, txt = FILES[name].make();
+    const done = label => { c.innerHTML = ic(label === 'Copied' ? 'check' : 'copy') + `<span>${label}</span>`; announce(label === 'Copied' ? `${name} copied` : `${name} selected. Press Ctrl+C to copy.`); setTimeout(() => { c.innerHTML = ic('copy') + '<span>Copy</span>'; }, 1800); };
+    const fallback = () => {
+      const pre = $(preId(name)), r = document.createRange();
+      r.selectNodeContents(pre); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      done('Selected, press Ctrl+C');
+    };
+    try { navigator.clipboard.writeText(txt).then(() => done('Copied'), fallback); } catch (err) { fallback(); }
+  }
+});
+function toggleBroker(t) {
+  const b = Number(t.dataset.b);
+  down.has(b) ? down.delete(b) : down.add(b);
+  drawMap();
+  const again = map.querySelector(`.bhead[data-b="${b}"]`); again && again.focus();
+}
+function pickAcks(t) {
+  const v = t.dataset.acks; set('acks', v);
+  const again = map.querySelector(`.ackseg[data-acks="${v}"]`); again && again.focus();
+}
+map.addEventListener('click', e => {
+  const t = e.target.closest('.bhead'); if (t) return toggleBroker(t);
+  const a = e.target.closest('.ackseg'); if (a) return pickAcks(a);
+  if (e.target.closest('.partbtn')) return showHash();
+  const gn = e.target.closest('.gname'); if (gn) return focusGroup(Number(gn.dataset.g));
+  const gc = e.target.closest('.gctl'); if (gc && gc.getAttribute('aria-disabled') !== 'true') groupCtl(gc.dataset.gctl);
+});
+map.addEventListener('keydown', e => {
+  const t = e.target.closest('.bhead, .ackseg, .partbtn, .gname, .gctl');
+  if (!t || (e.key !== 'Enter' && e.key !== ' ')) return;
+  e.preventDefault();
+  if (t.classList.contains('bhead')) toggleBroker(t);
+  else if (t.classList.contains('partbtn')) showHash();
+  else if (t.classList.contains('gname')) focusGroup(Number(t.dataset.g));
+  else if (t.classList.contains('gctl')) { if (t.getAttribute('aria-disabled') !== 'true') groupCtl(t.dataset.gctl); }
+  else pickAcks(t);
+});
+$('skip').addEventListener('click', e => { e.preventDefault(); const h = $('step-h'); if (h) { h.scrollIntoView({ block: 'start' }); h.focus({ preventScroll: true }); } });
+$('back').addEventListener('click', () => go(step - 1));
+$('next').addEventListener('click', () => go(step < STEPS.length - 1 ? step + 1 : 0));
+const play = $('play');
+const syncPlay = () => { play.innerHTML = running ? ic('player-pause') + 'Pause animation' : ic('player-play') + 'Play animation'; };
+play.addEventListener('click', () => {
+  running = !running;
+  if (!running) { msgs.forEach(m => m.el && m.el.remove()); msgs = []; }
+  syncPlay();
+});
+
+// Theme switch: automatic (follows the system), light, or dark; remembered in this browser
+const THEMES = { auto: ['device-desktop', 'Theme: automatic. Switch to light'], light: ['sun', 'Theme: light. Switch to dark'], dark: ['moon', 'Theme: dark. Switch to automatic'] };
+const themeBtn = $('theme');
+let theme = document.documentElement.getAttribute('data-theme') || 'auto';
+function syncTheme() {
+  const [icon, label] = THEMES[theme];
+  themeBtn.innerHTML = ic(icon, 17); themeBtn.setAttribute('aria-label', label); themeBtn.title = label;
+}
+themeBtn.addEventListener('click', () => {
+  theme = { auto: 'light', light: 'dark', dark: 'auto' }[theme];
+  if (theme === 'auto') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', theme);
+  try { theme === 'auto' ? localStorage.removeItem('kafka-pilot-theme') : localStorage.setItem('kafka-pilot-theme', theme); } catch (e) {}
+  syncTheme(); announce(themeBtn.getAttribute('aria-label').split('.')[0]);
+});
+syncTheme();
+
+normalize();
+if (window.gsap) document.documentElement.classList.add('has-gsap');
+renderAll(); syncPlay();
+moveRail(false);
+addEventListener('resize', () => moveRail(false));
+if (document.fonts) document.fonts.ready.then(() => moveRail(false));
+playIntro();
+requestAnimationFrame(frame);
+})();
+</script>

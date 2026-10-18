@@ -1,0 +1,4 @@
+# scratch area: screenshots, backups, downloaded test libraries
+.qa/
+tests/out/
+node_modules/
