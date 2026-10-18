@@ -4,7 +4,7 @@ A visual guide to configuring Apache Kafka®. Answer a few plain questions, watc
 
 It is a single HTML page with no build step and no server. Nothing you type leaves the page.
 
-**Live version:** https://claude.ai/artifact/X8zLdwWsTi7grAXyaEg11m (private until shared from the page's Share menu)
+**Try it:** https://fattahpour.github.io/kafka-config/
 
 ## What it does
 
