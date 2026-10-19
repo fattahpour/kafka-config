@@ -1,4 +1,6 @@
-<title>Kafka Config</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Kafka Config · Visual configuration studio</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="color-scheme" content="light dark">
 <script>
@@ -634,6 +636,49 @@ textarea.field { max-width: none; min-height: 150px; font-family: var(--mono); f
   .track.blocked { animation: none; }
   .jn.moving { animation: none; }
 }
+/* Spatial explorer: progressive enhancement, with the SVG map retained as a full fallback. */
+.top .lede {font-weight:650; font-size:clamp(28px,3.2vw,46px); letter-spacing:-.045em; max-width:850px}
+.top .lede span {color:var(--accent)}
+.stage {border:1px solid var(--rule); box-shadow:0 12px 40px #12152d08; border-radius:18px}
+.explorer-bar {display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--rule)}
+.view-switch {display:flex;background:var(--lane);border:1px solid var(--rule);border-radius:10px;padding:3px;gap:3px}
+.explorer-bar button,.explorer-actions button,.scene-camera button {font:inherit;font-size:12px;min-height:36px;border:1px solid var(--rule);background:var(--surface);color:var(--ink);border-radius:7px;padding:6px 12px;cursor:pointer}
+.view-switch button {border-color:transparent;background:transparent}
+.view-switch button[aria-pressed=true] {background:var(--surface);border-color:var(--rule);box-shadow:0 2px 5px #0000000a;color:var(--accent)}
+.explorer-bar .scene-options {display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+.scene-options select {font:inherit;max-width:140px;border:1px solid var(--rule);border-radius:6px;padding:8px}
+.explorer-notice {margin:0;font-size:12px;color:var(--muted)}
+.spatial {border:1px solid #29394c;border-radius:12px;overflow:hidden;background:#0b1422;color:#e8effb;position:relative}
+.scene-heading {display:flex;justify-content:space-between;align-items:center;gap:12px;padding:18px 20px 0;position:relative;z-index:1}
+.scene-heading strong {font-size:14px;font-weight:550}.scene-heading small {display:block;color:#99abc3;font-size:11px;margin-top:3px}
+.scene-badge {font:10px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:#80dfce;border:1px solid #31504e;padding:5px 9px;border-radius:20px;white-space:nowrap}
+.scene-viewport {position:relative;height:420px;overflow:hidden; background:radial-gradient(ellipse at 50% 55%,#24405a66,transparent 65%)}
+.scene-viewport canvas {width:100%;height:100%;display:block;touch-action:pan-y;cursor:grab}
+.scene-viewport canvas:active {cursor:grabbing}
+.scene-labels {position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.scene-label {position:absolute;transform:translate(-50%,-100%);pointer-events:auto;background:#142335ed;color:#e8effb;border:1px solid #3b536c;border-radius:6px;padding:4px 8px;font:11px var(--sans);white-space:nowrap;cursor:pointer;box-shadow:0 3px 12px #0004}
+.scene-label[aria-pressed=true] {border-color:#b3acff;box-shadow:0 0 0 2px #958bff44}
+.scene-label:focus-visible {outline:2px solid #c4baff}
+.scene-label.is-down {color:#ffb0ae;border-color:#ad5d63}
+.scene-camera {display:flex;gap:5px;position:absolute;bottom:12px;right:14px;z-index:2}
+.scene-camera button {color:#dbe7f7;background:#17283c;border-color:#354b65;font-size:12px;min-width:38px}
+.scene-hint {position:absolute;left:16px;bottom:16px;color:#94a9c4;font-size:11px;pointer-events:none}
+.scene-metrics {display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #29394c;background:#101e30}
+.scene-metrics div {padding:12px 18px;border-right:1px solid #29394c}.scene-metrics div:last-child {border:0}
+.scene-metrics span {font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:#9eafc6;display:block}
+.scene-metrics strong {font:500 20px var(--mono);display:block;margin-top:4px}
+.explorer-inspect {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;background:var(--lane);border:1px solid var(--rule);border-radius:10px;padding:14px 16px}
+.explorer-inspect h3 {font-size:13px;margin:0 0 4px}.explorer-inspect p {font-size:12px;margin:0;color:var(--muted);max-width:90ch}
+.explorer-actions {display:flex;gap:6px;flex-wrap:wrap}.explorer-actions button {white-space:nowrap}
+.explorer-actions button.danger {color:var(--danger);border-color:var(--danger)}
+.partition-nav {display:flex;gap:5px;flex-wrap:wrap;padding:6px 0;align-items:center;font-size:11px;color:var(--muted)}
+.partition-nav button {font:11px var(--mono);border:1px solid var(--rule);background:var(--surface);color:var(--ink);padding:5px 9px;min-height:32px;border-radius:6px;cursor:pointer}
+.partition-nav button[aria-pressed=true] {color:var(--accent);border-color:var(--accent);background:var(--glow)}
+.stage[data-view="3d"] .stage-scroll,.stage[data-view="3d"] .scroll-hint,.stage[data-view="3d"] .lanetabs {display:none}
+.stage[data-view="3d"] .legend {max-width:100%}
+@media(max-width:680px){.scene-heading{padding:12px 12px 0}.scene-viewport{height:330px}.scene-metrics div{padding:10px 8px}.scene-metrics strong{font-size:17px}.scene-metrics span{font-size:9px}.scene-hint{bottom:57px;font-size:10px}.explorer-inspect{grid-template-columns:1fr}.scene-badge{font-size:9px}.explorer-bar{gap:8px}.explorer-bar .scene-options{width:100%;justify-content:space-between}.stage{padding:12px}.scene-label{font-size:10px;padding:3px 6px}.scene-camera{right:10px}}
+@media(prefers-reduced-motion:reduce){.spatial *{animation:none!important;transition:none!important}}
+
 </style>
 
 <div class="app">
@@ -664,8 +709,8 @@ textarea.field { max-width: none; min-height: 150px; font-family: var(--mono); f
   <main class="main" id="main">
     <header class="top">
       <p class="crumb"><span>Kafka Config</span><span class="sep" aria-hidden="true">/</span><span id="crumb-step"></span><span class="pill" id="crumb-pill"><i aria-hidden="true"></i><span></span></span><button type="button" class="link-btn sharebtn" id="share" data-tip="share" aria-expanded="false" aria-controls="sharebox"></button></p>
-      <p class="lede">Configure Kafka in five plain questions. <span>See it, then copy it.</span></p>
-      <p class="sub-lede">Answer a few questions about your topic. Watch the diagram change, then copy working producer, broker and consumer configs.</p>
+      <p class="lede">Your Kafka architecture.<br><span>See it. Shape it. Ship it.</span></p>
+      <p class="sub-lede">Build your topology, explore the trade-offs, and leave with working configuration. Five guided steps. One live playground.</p>
       <div class="sharebox" id="sharebox" hidden>
         <p><b>Share this setup.</b> The link opens Kafka Config with these answers. If it opens without them, because some sites drop the part after #, paste the code into <em>Import</em> on the Goal step.</p>
         <div class="sharerow"><label for="share-link">Link</label><input class="field" id="share-link" readonly data-tip="share-link"><button type="button" class="btn" data-copyshare="link" data-tip="share-copy-link"></button></div>
@@ -677,6 +722,32 @@ textarea.field { max-width: none; min-height: 150px; font-family: var(--mono); f
       <div class="stage-head"><h2><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M19 7a2 2 0 1 0 0 -4a2 2 0 0 0 0 4"/><path d="M11 19h5.5a3.5 3.5 0 0 0 0 -7h-8a3.5 3.5 0 0 1 0 -7h4.5"/></svg>Pipeline</h2><span class="pgoal" id="pgoal"></span><button type="button" class="link-btn" id="chal-btn" data-tip="chal" aria-expanded="false" aria-controls="chal"></button><span class="live"><i aria-hidden="true"></i>Live</span></div>
       <div class="chal" id="chal" hidden tabindex="-1" aria-label="Challenge"></div>
       <div class="pbar" id="pbar" role="toolbar" aria-label="Change the pipeline"></div>
+      <div class="explorer-bar">
+        <div class="view-switch" role="group" aria-label="Visualization view">
+          <button type="button" id="view-3d" aria-pressed="false" aria-controls="spatial">◇ 3D explorer</button>
+          <button type="button" id="view-2d" aria-pressed="true" aria-controls="map">▤ 2D detail</button>
+        </div>
+        <div class="scene-options"><span>Explore the system. Understand the trade-offs.</span><label>Quality <select id="scene-quality" aria-label="3D render quality"><option value="eco">Eco · 20 fps</option><option value="balanced" selected>Balanced · 30 fps</option></select></label></div>
+      </div>
+      <p class="explorer-notice" id="scene-notice" role="status">3D loads on demand. The 2D view works without WebGL.</p>
+      <div id="spatial" class="spatial" hidden>
+        <div class="scene-heading"><div><strong id="scene-topic">Your event pipeline</strong><small>PRODUCE → REPLICATE → CONSUME</small></div><span class="scene-badge" id="scene-badge">Learning simulation</span></div>
+        <div class="scene-viewport" id="scene-viewport">
+          <div class="scene-labels" id="scene-labels"></div>
+          <span class="scene-hint">Drag to orbit · Select a node to inspect</span>
+          <div class="scene-camera" role="group" aria-label="3D camera controls">
+            <button type="button" id="camera-left" aria-label="Rotate camera left">↶</button><button type="button" id="camera-right" aria-label="Rotate camera right">↷</button>
+            <button type="button" id="camera-in" aria-label="Zoom in">＋</button><button type="button" id="camera-out" aria-label="Zoom out">−</button><button type="button" id="camera-reset">Reset view</button>
+          </div>
+        </div>
+        <div class="scene-metrics" aria-label="Simulation metrics"><div><span>Brokers online</span><strong id="metric-brokers">—</strong></div><div><span>Writable partitions</span><strong id="metric-writes">—</strong></div><div><span>Replica copies</span><strong id="metric-copies">—</strong></div><div><span>Total group lag</span><strong id="metric-lag">—</strong></div></div>
+      </div>
+      <div class="partition-nav" id="partition-nav" role="group" aria-label="Inspect a partition" hidden></div>
+      <div class="explorer-inspect" id="explorer-inspect" hidden>
+        <div><h3 id="inspect-title">Explore your pipeline</h3><p id="inspect-text">Select a producer, broker, consumer group or partition to see what it does.</p></div>
+        <div class="explorer-actions"><button type="button" id="inspect-action" hidden></button><button type="button" id="inspect-config">Edit cluster</button></div>
+      </div>
+
       <p class="scroll-hint">Swipe sideways to see the whole diagram, or jump to a section:</p>
       <div class="lanetabs" role="group" aria-label="Jump to a section of the diagram">
         <button type="button" data-lane="0" data-tip="lane:0" aria-pressed="true">Your apps · write</button>
@@ -793,6 +864,7 @@ const PKEYS = Object.keys(PRESETS.balanced).filter(k => k !== 'label' && k !== '
 const STORE = 'kafka-pilot-v2';  // storage keys keep the earlier name so saved answers survive the rename
 
 let S = { more: [], commitWhen: 'after', assign: 'range', security: 'none', racks: false, retBytes: 0, compactLag: 0, bufferMB: 32, staticMember: false, commitEvery: 5, goal: 'starter', topic: 'orders', host: 'kafka', group: 'orders-service', lang: 'java', keys: ['customer-42', 'customer-7'], hotKey: false };
+let spatialExplorer = null;
 let importText = '', importReport = null, rk = 0;
 PKEYS.forEach(k => { S[k] = PRESETS.starter[k]; });
 try { const saved = JSON.parse(localStorage.getItem(STORE) || 'null'); if (saved) S = Object.assign(S, saved); } catch (e) {}
@@ -2446,6 +2518,7 @@ function drawMap() {
   renderLag(true);
   flip(prev, oldLeaders);
   prevSig = `${G.B}|${G.P}|${G.C}|${S.rf}`;
+  if (spatialExplorer) spatialExplorer.sync();
 }
 function statusText() {
   const ps = G.parts;
@@ -2602,7 +2675,7 @@ function readStep(now) {
 function pulse(el, cls, ms) { if (!el) return; el.classList.add(cls); setTimeout(() => el.classList.remove(cls), ms); }
 function frame(now) {
   requestAnimationFrame(frame);
-  if (!running || !G || !introDone) return;
+  if (document.hidden || !running || !G || !introDone) return;
   // more producers send more often
   if (now - lastSpawn > (700 + S.linger * 7) / G.N && msgs.length < 320) { lastSpawn = now; spawn(now); }
   readStep(now);
@@ -2669,6 +2742,7 @@ function frame(now) {
       pos = along([[G.chipX(m.p, m.from), y], [G.chipX(m.p, m.to), y]], ease(t / 600));
     }
     if (m.dead) continue;
+    if (window.__kc3DActive) { if (m.el) { m.el.remove(); m.el = null; } continue; }
     if (!m.el || !m.el.isConnected) {
       m.el = document.createElementNS(NS, 'g');
       m.el.appendChild(document.createElementNS(NS, 'circle'));
@@ -3277,7 +3351,294 @@ addEventListener('resize', () => moveRail(false));
 if (document.fonts) document.fonts.ready.then(() => moveRail(false));
 playIntro();
 requestAnimationFrame(frame);
+/* ---------- Optional Three.js spatial explorer ----------
+ * One renderer, reusable geometry/materials, capped pixel ratio and frame rate.
+ * Reads the SAME simulation (G, logs, msgs); it never invents Kafka state.
+ * No postprocessing, shadows, textures, model downloads or framework runtime.
+ */
+function createSpatialExplorer() {
+  const stage = document.querySelector('.stage'), panel = $('spatial'), viewport = $('scene-viewport');
+  const labelLayer = $('scene-labels'), notice = $('scene-notice');
+  let renderer, scene, camera, world, T, particleMesh, selectionMesh;
+  let active = false, visible = true, loading = null, wanted = false, unavailable = false;
+  let timer = 0, raf = 0, lastStats = 0, selected = { type: 'overview', id: 0 };
+  let yaw = .32, pitch = .63, zoom = 1, width = 1, height = 1, dragging = null;
+  let labels = [], targets = [], positions = {}, resources = [], topologySignature = '';
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const quality = $('scene-quality');
+  if (navigator.connection?.saveData || (navigator.deviceMemory && navigator.deviceMemory <= 4) || innerWidth < 680) quality.value = 'eco';
+  const colors = { producer: 0x63e6be, broker: 0x9990ff, consumer: 0xffb0df, rep: 0x9b96ff, ack: 0x67d6ff, err: 0xff777f };
+  const materialCache = new Map();
+  const hints = {
+    'view-3d': 'Explore live producers, brokers and consumer groups in 3D. Loads Three.js only when needed.',
+    'view-2d': 'Show the detailed partition logs and offsets. Works without WebGL.',
+    'scene-quality': 'Eco caps rendering at 20 frames per second and one device pixel per CSS pixel. Balanced caps at 30 fps and 1.5 pixels.',
+    'camera-left': 'Rotate the scene to the left. You can also drag on the canvas.',
+    'camera-right': 'Rotate the scene to the right. You can also drag on the canvas.',
+    'camera-in': 'Move closer to the topology.', 'camera-out': 'Move away from the topology.',
+    'camera-reset': 'Restore the initial angle and zoom so the entire topology fits.',
+    'inspect-config': 'Open the configuration step for the selected component.',
+    'inspect-action': 'Change only the simulation: stop or restore the selected broker.'
+  };
+  function tooltip(el, body) { el.dataset.tip = 'raw'; el.dataset.tipTitle = el.getAttribute('aria-label') || el.textContent; el.dataset.tipBody = body; }
+  Object.entries(hints).forEach(([id, body]) => tooltip($(id), body));
+  function remember(value) { try { localStorage.setItem('kafka-config-view', value); } catch (_) {} }
+  function cancel() { clearTimeout(timer); cancelAnimationFrame(raf); timer = raf = 0; }
+  function invalidate() {
+    if (!active || !visible || document.hidden || !renderer || raf || timer) return;
+    raf = requestAnimationFrame(render);
+  }
+  function switchView(use3D, persist = true) {
+    active = use3D; window.__kc3DActive = use3D;
+    stage.dataset.view = use3D ? '3d' : '2d'; panel.hidden = !use3D;
+    $('partition-nav').hidden = $('explorer-inspect').hidden = !use3D;
+    $('view-3d').setAttribute('aria-pressed', String(use3D)); $('view-2d').setAttribute('aria-pressed', String(!use3D));
+    if (persist) remember(use3D ? '3d' : '2d');
+    cancel();
+    if (use3D) { resize(); sync(); invalidate(); }
+    else { msgs.forEach(m => { if (m.el) m.el.remove(); m.el = null; }); }
+  }
+  function loadThree() {
+    if (window.THREE) return Promise.resolve(window.THREE);
+    if (loading) return loading;
+    loading = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.min.js';
+      script.crossOrigin = 'anonymous';
+      const timeout = setTimeout(() => { script.remove(); reject(new Error('timeout')); }, 12000);
+      script.onload = () => { clearTimeout(timeout); window.THREE ? resolve(window.THREE) : reject(new Error('load')); };
+      script.onerror = () => { clearTimeout(timeout); script.remove(); reject(new Error('network')); };
+      document.head.appendChild(script);
+    }).catch(error => { loading = null; throw error; });
+    return loading;
+  }
+  async function enable() {
+    wanted = true;
+    if (unavailable) { notice.textContent = '3D is unavailable in this browser session. Use the full 2D view, or reload to try again.'; return; }
+    notice.textContent = 'Loading the lightweight 3D explorer…'; $('view-3d').setAttribute('aria-busy', 'true');
+    try {
+      T = await loadThree();
+      if (!wanted) return;
+      if (!renderer) initialize();
+      switchView(true);
+      notice.textContent = 'Live simulation · mint: writes · violet: replication · blue: acknowledgements · pink: reads · red: refused writes';
+    } catch (_) {
+      unavailable = true; switchView(false, false);
+      notice.textContent = '3D could not start (WebGL or network unavailable). All configuration features remain available in 2D.';
+    } finally { $('view-3d').removeAttribute('aria-busy'); }
+  }
+  function mat(color) {
+    if (!materialCache.has(color)) materialCache.set(color, new T.MeshLambertMaterial({ color }));
+    return materialCache.get(color);
+  }
+  let boxGeometry, dotGeometry, edgeGeometry, lineMaterial, dummy, point;
+  function cube(x, y, z, sx, sy, sz, color, target) {
+    const mesh = new T.Mesh(boxGeometry, mat(color)); mesh.position.set(x,y,z); mesh.scale.set(sx,sy,sz);
+    world.add(mesh); if (target) { mesh.userData.target = target; targets.push(mesh); }
+    return mesh;
+  }
+  function label(text, pos, target, downState = false) {
+    const el = document.createElement('button'); el.type = 'button'; el.className = 'scene-label' + (downState ? ' is-down' : '');
+    el.textContent = text; el.setAttribute('aria-label', 'Inspect ' + text); el.setAttribute('aria-pressed', 'false');
+    tooltip(el, 'Select to inspect this component and its configuration.');
+    el.addEventListener('click', () => select(target)); labelLayer.append(el); labels.push({el, pos, target});
+  }
+  function route(a,b,color) {
+    const middle = new T.Vector3((a.x+b.x)/2, Math.max(a.y,b.y)+.65, (a.z+b.z)/2);
+    const geo = new T.BufferGeometry().setFromPoints(new T.QuadraticBezierCurve3(a,middle,b).getPoints(16)); resources.push(geo);
+    const material = new T.LineBasicMaterial({color, transparent:true, opacity:.26}); resources.push(material);
+    const line = new T.Line(geo,material); world.add(line);
+  }
+  function initialize() {
+    renderer = new T.WebGLRenderer({antialias:false,alpha:true,powerPreference:'low-power'});
+    renderer.setClearColor(0x0b1422,0); renderer.outputColorSpace = T.SRGBColorSpace;
+    const canvas = renderer.domElement; canvas.setAttribute('aria-label','Interactive Kafka topology. Use component buttons to inspect and camera buttons to rotate or zoom.');
+    canvas.setAttribute('role','img'); viewport.prepend(canvas);
+    scene = new T.Scene(); world = new T.Group(); scene.add(world);
+    scene.add(new T.HemisphereLight(0xc9dcff,0x172439,2.3));
+    const light = new T.DirectionalLight(0xffffff,2); light.position.set(-5,10,8); scene.add(light);
+    camera = new T.PerspectiveCamera(40,1,.1,200);
+    boxGeometry = new T.BoxGeometry(1,1,1); dotGeometry = new T.IcosahedronGeometry(.075,0);
+    edgeGeometry = new T.EdgesGeometry(boxGeometry); lineMaterial = new T.LineBasicMaterial({color:0xc5bdff});
+    selectionMesh = new T.LineSegments(edgeGeometry,lineMaterial); selectionMesh.visible=false; scene.add(selectionMesh);
+    particleMesh = new T.InstancedMesh(dotGeometry,new T.MeshBasicMaterial({color:0xffffff}),320);
+    particleMesh.instanceMatrix.setUsage(T.DynamicDrawUsage); particleMesh.count=0; particleMesh.frustumCulled=false; scene.add(particleMesh);
+    dummy = new T.Object3D(); point = new T.Vector3();
+    const grid = new T.GridHelper(32,32,0x38506b,0x21354c); grid.position.y=-.14; scene.add(grid);
+    canvas.addEventListener('webglcontextlost', e => {e.preventDefault(); unavailable=true; wanted=false; switchView(false,false); notice.textContent='Graphics context was lost. Switched to the full 2D view. Reload to retry 3D.';});
+    canvas.addEventListener('pointerdown', e => {
+      if (!e.isPrimary || e.button !== 0) return;
+      dragging={x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false,id:e.pointerId}; canvas.setPointerCapture(e.pointerId);
+    });
+    canvas.addEventListener('pointermove', e => {
+      if(!dragging || e.pointerId!==dragging.id) return;
+      if(Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)>6) dragging.moved=true;
+      if(dragging.moved){yaw+=(e.clientX-dragging.lastX)*.006; pitch=clamp(pitch+(e.clientY-dragging.lastY)*.004,.2,1.25); cameraPosition(); invalidate();}
+      dragging.lastX=e.clientX; dragging.lastY=e.clientY;
+    });
+    canvas.addEventListener('pointerup', e => {
+      if(!dragging) return;
+      const tap=!dragging.moved; dragging=null;
+      if(tap){ const rect=canvas.getBoundingClientRect(), ray=new T.Raycaster(); ray.setFromCamera(new T.Vector2((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1),camera);
+        const hit=ray.intersectObjects(targets,false)[0]; if(hit)select(hit.object.userData.target); }
+    });
+    canvas.addEventListener('pointercancel',()=>dragging=null);
+    new ResizeObserver(resize).observe(viewport);
+  }
+  function cameraPosition() {
+    if(!camera) return;
+    // Fit width on phones instead of cropping producers and consumers.
+    const distance=Math.max(23, 19 / Math.max(.45,camera.aspect))*zoom;
+    camera.position.set(Math.sin(yaw)*Math.cos(pitch)*distance, Math.sin(pitch)*distance+1.4, Math.cos(yaw)*Math.cos(pitch)*distance);
+    camera.lookAt(0,1.4,0); camera.updateMatrixWorld();
+  }
+  function resize() {
+    if(!active || !renderer) return;
+    width=viewport.clientWidth; height=viewport.clientHeight; if(!width || !height)return;
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1,quality.value==='eco'?1:1.5)); renderer.setSize(width,height,false);
+    camera.aspect=width/height; camera.updateProjectionMatrix(); cameraPosition(); invalidate();
+  }
+  function build() {
+    if(!renderer)return;
+    world.clear(); resources.forEach(r=>r.dispose());resources=[]; targets=[]; labels=[];labelLayer.replaceChildren(); positions={};
+    const vec=(x,y,z)=>new T.Vector3(x,y,z);
+    // Producers and groups use their own lanes; brokers sit on the middle platform.
+    cube(-7,0,0,2.4,.12,Math.max(3,S.producers*1.25),0x173b3d);
+    cube(0,0,0,Math.max(3,S.brokers*2.2),.12,5.8,0x252845);
+    cube(7,0,0,2.4,.12,Math.max(3,G.gs.length*2.6),0x3a2440);
+    for(let i=0;i<S.producers;i++){
+      const z=(i-(S.producers-1)/2)*1.35, target={type:'producer',id:i};
+      positions['producer'+i]=vec(-7,.85,z);
+      cube(-7,.7,z,1.05,1.15,.75,0x255b56,target);cube(-7,.82,z+.39,.78,.52,.06,colors.producer,target);
+      label('App '+(i+1),vec(-7,1.65,z),target);
+    }
+    for(let b=0;b<S.brokers;b++){
+      const x=(b-(S.brokers-1)/2)*2.1,target={type:'broker',id:b},off=down.has(b);
+      positions['broker'+b]=vec(x,1.4,0);
+      cube(x,.95,0,1.55,1.8,1.25,off?0x59303d:0x3c4268,target);
+      for(let j=0;j<3;j++) {cube(x,.5+j*.45,.65,1.25,.25,.06,off?0x7c414a:0x68699d,target);cube(x-.46,.5+j*.45,.7,.09,.08,.03,off?colors.err:colors.producer,target);}
+      label('Broker '+(b+1)+(off?' · offline':''),vec(x,2.3,0),target,off);
+    }
+    G.gs.forEach((g,i)=>{
+      const z=(i-(G.gs.length-1)/2)*2.7,target={type:'group',id:i};positions['group'+i]=vec(7,1,z);
+      cube(7,.65,z,1.2,1.15,.9,0x684667,target);
+      for(let c=0;c<g.consumers;c++)cube(6.6+(c%4)*.26,.4+Math.floor(c/4)*.35,z+.47,.17,.22,.05,colors.consumer,target);
+      label(g.name.slice(0,18)+(g.name.length>18?'…':'')+' · '+g.consumers,vec(7,1.6,z),target);
+    });
+    // Each physical copy is a tile. Solid bright tiles are leaders; dim tiles are followers.
+    G.parts.forEach(p=>{
+      p.reps.forEach(b=>{
+        const x=positions['broker'+b].x+(p.p%3-1)*.43, z=1.25+Math.floor(p.p/3)*.45;
+        const v=vec(x,.25,z);positions['partition'+p.p+'b'+b]=v;
+        cube(x,.22,z,.34,.26,.32,down.has(b)?0x663c48:p.leader===b?0xb9b0ff:0x525782,{type:'partition',id:p.p});
+      });
+    });
+    // One route per unique endpoint; avoid visual spaghetti at large partition counts.
+    const routes=new Set();
+    function unique(a,b,color){const key=a+'>'+b;if(routes.has(key)||!positions[a]||!positions[b])return;routes.add(key);route(positions[a],positions[b],color);}
+    G.parts.forEach(p=>{
+      if(p.leader===null)return;
+      for(let i=0;i<S.producers;i++)unique('producer'+i,'broker'+p.leader,colors.producer);
+      p.alive.filter(b=>b!==p.leader).forEach(b=>unique('broker'+p.leader,'broker'+b,colors.rep));
+      G.gs.forEach((_,g)=>unique('broker'+p.leader,'group'+g,colors.consumer));
+    });
+    $('partition-nav').replaceChildren();
+    const caption=document.createElement('span'); caption.textContent='Trace a partition';$('partition-nav').append(caption);
+    G.parts.forEach(p=>{const b=document.createElement('button');b.type='button';b.textContent='P'+p.p;b.dataset.partition=p.p;b.setAttribute('aria-pressed','false');tooltip(b,'Inspect leader, replicas, writable state and consumer assignment for partition '+p.p);b.addEventListener('click',()=>select({type:'partition',id:p.p}));$('partition-nav').append(b);});
+    updateSelection();
+  }
+  function select(target){selected=target;updateSelection();inspect();invalidate();}
+  function updateSelection(){
+    if(!renderer)return;
+    const match=t=>t.type===selected.type&&t.id===selected.id;
+    labels.forEach(l=>l.el.setAttribute('aria-pressed',String(match(l.target))));
+    document.querySelectorAll('[data-partition]').forEach(b=>b.setAttribute('aria-pressed',String(selected.type==='partition'&&+b.dataset.partition===selected.id)));
+    const mesh=targets.find(m=>match(m.userData.target));selectionMesh.visible=!!mesh;
+    if(mesh){selectionMesh.position.copy(mesh.position);selectionMesh.scale.copy(mesh.scale).multiplyScalar(1.1);}
+  }
+  function inspect(){
+    let title='Explore your pipeline',text='Select a node or partition. Fail a broker to watch leadership move, then inspect the settings behind the behavior.',stepIndex=1;
+    const {type,id}=selected, action=$('inspect-action');action.hidden=true;
+    if(type==='broker'&&id<S.brokers){
+      const leads=G.parts.filter(p=>p.leader===id).length,copies=G.parts.filter(p=>p.reps.includes(id)).length;
+      title='Broker '+(id+1)+(down.has(id)?' · offline':' · online');text=`Stores ${copies} partition copies; currently leads ${leads}. Stopping this broker changes the simulation only. Writes require a live leader${S.acks==='all'?` and at least ${S.minIsr} in-sync replicas`:''}.`;
+      action.hidden=false;action.textContent=down.has(id)?'Restore broker':'Simulate failure';action.classList.toggle('danger',!down.has(id));
+    }else if(type==='partition'&&G.parts[id]){
+      const p=G.parts[id], L=logs[id]; title='Partition '+id+' · '+(p.writable?'accepting writes':'writes blocked');
+      text=`Leader: ${p.leader===null?'none':'broker '+(p.leader+1)}. Replicas: ${p.reps.map(b=>b+1).join(', ')}. In sync: ${p.alive.length}/${S.rf}. High watermark: ${L.hw}. `+G.gs.map((g,i)=>`${g.name}: consumer ${(G.own[i][id]??0)+1}, lag ${Math.max(0,L.hw-L.cons[i])}.`).join(' ');
+    }else if(type==='producer'){
+      title='Producer '+(id+1)+' · write path';stepIndex=2;text=`acks=${S.acks}; idempotence ${S.idem?'on':'off'}; ${S.compression} compression; linger ${S.linger} ms. Keys select a partition; records with the same key use the same partition while the partition count stays unchanged.`;
+    }else if(type==='group'&&G.gs[id]){
+      const g=G.gs[id];title=g.name+' · consumer group';stepIndex=3;text=`${g.consumers} consumers share ${S.partitions} partitions. ${Math.max(0,g.consumers-S.partitions)} consumers are idle. Current simulated lag: ${groupLag(id)}. Each group independently reads the topic.`;
+    }
+    $('inspect-title').textContent=title;$('inspect-text').textContent=text;
+    $('inspect-config').textContent='Edit '+['goal','cluster','producer','consumer'][stepIndex];$('inspect-config').dataset.step=stepIndex;
+  }
+  function stats(){
+    $('scene-topic').textContent=topic()+' / event pipeline';
+    $('metric-brokers').textContent=(S.brokers-down.size)+' / '+S.brokers;
+    $('metric-writes').textContent=G.parts.filter(p=>p.writable).length+' / '+S.partitions;
+    $('metric-copies').textContent=S.partitions*S.rf;
+    $('metric-lag').textContent=G.gs.reduce((sum,_,i)=>sum+groupLag(i),0);
+    $('scene-badge').textContent=running?'Learning simulation':'Simulation paused';inspect();
+  }
+  function sync(){
+    if(!active||!renderer)return;
+    const sig=JSON.stringify([S.producers,S.brokers,S.partitions,S.rf,[...down],G.gs]);
+    if(sig!==topologySignature){topologySignature=sig;build();}
+    stats();invalidate();
+  }
+  function particlePosition(m,now){
+    const p=G.parts[m.p];if(!p||m.dead)return null;
+    const leader=p.leader===null?null:positions['broker'+p.leader];
+    let a,b,duration=1000;
+    if(m.kind==='msg'){a=positions['producer'+(m.src||0)];b=leader||positions['broker'+p.reps[0]];}
+    else if(m.kind==='ack'||m.kind==='err'){a=leader||positions['broker'+p.reps[0]];b=positions['producer'+(m.src||0)];duration=m.kind==='ack'?950:800;}
+    else if(m.kind==='rep'){a=positions['broker'+m.from];b=positions['broker'+m.to];duration=600;}
+    else if(m.kind==='read'){a=leader;b=positions['group'+m.g];duration=900;}
+    if(!a||!b)return null;
+    const t=(now-m.t0)/duration;if(t<0||t>1)return null;
+    point.lerpVectors(a,b,t);point.y+=Math.sin(t*Math.PI)*.65;return point;
+  }
+  function render(now){
+    raf=0;if(!active||!visible||document.hidden)return;
+    let count=0;const color=new T.Color();
+    // Reduced-motion users can still run the numeric simulation without moving particles.
+    if(!reduced.matches)for(const m of msgs){const pos=particlePosition(m,now);if(!pos||count>=320)continue;
+      dummy.position.copy(pos);dummy.updateMatrix();particleMesh.setMatrixAt(count,dummy.matrix);
+      color.setHex(colors[m.kind]|| (m.kind==='read'?colors.consumer:colors.producer));particleMesh.setColorAt(count,color);count++;
+    }
+    particleMesh.count=count;particleMesh.instanceMatrix.needsUpdate=true;if(particleMesh.instanceColor)particleMesh.instanceColor.needsUpdate=true;
+    labels.forEach(l=>{point.copy(l.pos).project(camera);l.el.style.left=((point.x*.5+.5)*width)+'px';l.el.style.top=((-point.y*.5+.5)*height)+'px';l.el.hidden=point.z>1||point.z< -1;});
+    if(now-lastStats>500){stats();lastStats=now;}
+    renderer.render(scene,camera);
+    if(running)timer=setTimeout(()=>{timer=0;invalidate();},1000/(quality.value==='eco'?20:30));
+  }
+  $('view-3d').addEventListener('click',enable);
+  $('view-2d').addEventListener('click',()=>{wanted=false;switchView(false);notice.textContent='Detailed log view · select 3D explorer for spatial navigation.';});
+  $('camera-left').addEventListener('click',()=>{yaw-=.2;cameraPosition();invalidate();});
+  $('camera-right').addEventListener('click',()=>{yaw+=.2;cameraPosition();invalidate();});
+  $('camera-in').addEventListener('click',()=>{zoom=clamp(zoom*.85,.55,1.8);cameraPosition();invalidate();});
+  $('camera-out').addEventListener('click',()=>{zoom=clamp(zoom/ .85,.55,1.8);cameraPosition();invalidate();});
+  $('camera-reset').addEventListener('click',()=>{yaw=.32;pitch=.63;zoom=1;cameraPosition();invalidate();});
+  quality.addEventListener('change',resize);
+  $('inspect-action').addEventListener('click',()=>{if(selected.type!=='broker'||selected.id>=S.brokers)return;const id=selected.id;down.has(id)?down.delete(id):down.add(id);drawMap();announce('Broker '+(id+1)+(down.has(id)?' stopped.':' restored.'));});
+  $('inspect-config').addEventListener('click',()=>{go(+$('inspect-config').dataset.step);$('controls').scrollIntoView({behavior:reduced.matches?'auto':'smooth',block:'start'});});
+  play.addEventListener('click',()=>{stats();invalidate();});
+  document.addEventListener('visibilitychange',()=>{cancel();invalidate();});
+  if('IntersectionObserver'in window)new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;if(!visible)cancel();else invalidate();},{rootMargin:'100px'}).observe(panel);
+  reduced.addEventListener('change',invalidate);
+  // Keep first paint and low-end devices in 2D. Desktop progressively enhances after idle.
+  let preference=null;try{preference=localStorage.getItem('kafka-config-view');}catch(_){}
+  if(!window.__KP_TEST__&&(preference==='3d'||(!preference&&innerWidth>=900&&!reduced.matches&&!navigator.connection?.saveData))){
+    const idle=window.requestIdleCallback||((fn)=>setTimeout(fn,300));idle(()=>{if(!wanted&&stage.dataset.view!=='2d')enable();});
+  }
+  return {sync};
+}
+spatialExplorer = createSpatialExplorer();
+
 // Test hook: only the automated tests (tests/run.js) set __KP_TEST__ to read state and tooltip text
 if (window.__KP_TEST__) window.__kp = { S: () => S, tipText, tipFor, checks, partitionFor, groupLag, lagTrend, parts, assignOwners, G: () => G, files: () => Object.fromEntries(Object.entries(FILES).map(([n, f]) => [n, f.make()])) };
 })();
 </script>
+

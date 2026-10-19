@@ -386,8 +386,72 @@ test('reduced motion: no animation, still usable', async () => {
   noErrors(page); await page.context().close();
 });
 
+// The same pinned Three.js version as production; no CDN dependency in these tests.
+async function openSpatial(opts = {}) {
+  const page = await open(opts);
+  await page.route('**/three@0.160.1/build/three.min.js', route => route.fulfill({
+    contentType: 'application/javascript', body: fs.readFileSync(path.join(path.dirname(require.resolve('three')), 'three.min.js'), 'utf8')
+  }));
+  await page.click('#view-3d');
+  await page.waitForSelector('#spatial:not([hidden]) canvas');
+  return page;
+}
+
+test('3D: shares topology, broker failures and exports with the 2D simulation', async () => {
+  const page = await openSpatial();
+  await page.selectOption('#pb-goal', 'balanced');
+  await page.click('#play'); // Freeze offsets so metric comparisons are exact.
+  const files = await page.evaluate(() => window.__kp.files());
+  await page.getByRole('button', { name: 'Inspect Broker 1', exact: true }).click();
+  await page.click('#inspect-action');
+  assert((await page.textContent('#inspect-title')).includes('offline'), 'broker inspector did not reflect failure');
+  const state = await page.evaluate(() => ({ parts: window.__kp.parts(), brokers: window.__kp.S().brokers }));
+  assert(state.parts.every(p => p.leader !== 0), 'failed broker still leads a partition');
+  assert((await page.textContent('#metric-brokers')).trim() === `${state.brokers - 1} / ${state.brokers}`, 'online metric diverged');
+  await page.click('[data-partition="0"]');
+  assert((await page.textContent('#inspect-text')).includes('Leader: broker'), 'partition inspector missing elected leader');
+  await page.click('#camera-right'); await page.click('#camera-in'); await page.click('#camera-reset');
+  await page.selectOption('#scene-quality','eco');
+  assert(await page.evaluate(() => { const c=document.querySelector('#scene-viewport canvas');return c.width<=Math.ceil(c.clientWidth); }), 'eco pixel ratio exceeds one');
+  await page.screenshot({ path: path.join(OUT,'spatial-desktop.png'), fullPage:false });
+  await page.click('#view-2d');
+  assert(await page.isVisible('#map'), '2D fallback is not visible');
+  assert(JSON.stringify(files) === JSON.stringify(await page.evaluate(() => window.__kp.files())), 'visual inspection changed exported configs');
+  noErrors(page); await page.context().close();
+});
+
+test('3D: mobile, dense topology, reduced motion and context loss', async () => {
+  const page = await openSpatial({ w:390,h:844,reduced:true });
+  assert((await page.textContent('#play')).includes('Play'), 'reduced motion unexpectedly started simulation');
+  for(let i=0;i<4;i++)await page.click('#pb-brokers-inc');
+  for(let i=0;i<11;i++)await page.click('#pb-partitions-inc');
+  for(let i=0;i<4;i++)await page.click('#pb-rf-inc');
+  for(let i=0;i<2;i++)await page.click('#pb-groups-inc');
+  assert(await page.locator('[data-partition]').count()===12,'partition navigation failed at maximum topology');
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'3D causes mobile page overflow');
+  await page.click('[data-partition="11"]');
+  assert((await page.textContent('#inspect-title')).includes('Partition 11'),'last partition cannot be selected');
+  await page.screenshot({ path:path.join(OUT,'spatial-mobile.png'),fullPage:true });
+  // Inject the platform event to check graceful recovery without depending on a GPU driver.
+  await page.locator('#scene-viewport canvas').dispatchEvent('webglcontextlost');
+  assert(await page.isVisible('#map'),'context loss did not restore 2D');
+  assert((await page.textContent('#scene-notice')).includes('context was lost'),'context loss explanation missing');
+  noErrors(page);await page.context().close();
+});
+
+test('3D: library failure keeps configuration and fallback usable', async () => {
+  const page=await open();
+  await page.route('**/three@0.160.1/build/three.min.js',r=>r.fulfill({contentType:'application/javascript',body:'/* unavailable */'}));
+  await page.click('#view-3d');
+  await page.waitForFunction(()=>document.getElementById('scene-notice').textContent.includes('could not start'));
+  assert(await page.isVisible('#map'),'library failure hides the working 2D map');
+  await page.click('#pb-brokers-inc');
+  assert(await page.evaluate(()=>window.__kp.S().brokers)===2,'configuration broken after failed 3D load');
+  noErrors(page);await page.context().close();
+});
+
 (async () => {
-  browser = await chromium.launch();
+  browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   let failed = 0;
   for (const t of tests) {
     if (only && !t.name.includes(only)) continue;
@@ -401,3 +465,4 @@ test('reduced motion: no animation, still usable', async () => {
   console.log(failed ? `\n${failed} failed` : '\nall passed');
   process.exitCode = failed ? 1 : 0;
 })();
+

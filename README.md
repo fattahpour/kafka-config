@@ -124,3 +124,30 @@ Issues and suggestions are welcome on the [GitHub repository](https://github.com
 Icons are from [Tabler Icons](https://tabler.io/icons) (MIT). The Kafka logo is the version published on kafka.apache.org (Apache License 2.0) and is used only as a link to the project, following the [ASF trademark policy](https://www.apache.org/foundation/marks/). See the `THIRD_PARTY_LICENSE-*.txt` files.
 
 Apache®, Apache Kafka, Kafka®, and the Kafka logo are either registered trademarks or trademarks of the Apache Software Foundation in the United States and/or other countries. No endorsement by the Apache Software Foundation is implied by the use of these marks. Kafka Config is an independent learning tool.
+
+
+## 3D explorer (feature branch)
+
+The optional **3D explorer** is a progressive enhancement of the original SVG map.
+It reads the same simulation state and leaves configuration generation unchanged.
+
+- Select producers, brokers, consumer groups or partition tiles to inspect their settings.
+- Use the partition buttons to inspect leaders, replicas, watermarks and group assignments.
+- Select a broker and **Simulate failure** / **Restore broker** to explore failover.
+- Drag to orbit, or use the accessible rotate, zoom and reset buttons. Touch scrolling remains available.
+- Switch to **2D detail** for the original log slots, offset markers and detailed tooltips.
+- **Eco** caps rendering at 20 fps and pixel ratio 1; **Balanced** at 30 fps and pixel ratio 1.5.
+- One instanced mesh renders up to 320 message particles. No shadows, postprocessing or model downloads.
+- Rendering stops offscreen, in hidden tabs, and when the simulation is paused (until an interaction).
+- Reduced motion starts paused and suppresses 3D particles. Phones and data-saving connections start in 2D.
+- WebGL failure, context loss or a failed dependency download leaves the complete 2D tool available.
+
+Three.js **0.160.1** is loaded from jsDelivr only when 3D is requested (or after idle on a capable-sized desktop).
+This version supports WebGL 1 as well as WebGL 2. The core configuration tool needs no Three.js.
+An initial 3D load requires network access; an offline standalone build retains all 2D features.
+The Three.js development dependency supplies the identical library to browser tests without using a CDN.
+This is a learning simulation, not a live Kafka monitor or a throughput benchmark.
+
+Run `node tests/run.js '3D:'` for spatial interaction, failure, fallback and mobile checks.
+GitHub Actions also runs the existing regression suite and saves desktop/mobile screenshots and the build.
+Rendering performance and compatibility still need testing on physical mobile devices and Safari/Firefox.
