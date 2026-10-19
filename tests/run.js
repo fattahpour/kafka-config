@@ -447,6 +447,8 @@ test('3D: library failure keeps configuration and fallback usable', async () => 
   assert(await page.isVisible('#map'),'library failure hides the working 2D map');
   await page.click('#pb-brokers-inc');
   assert(await page.evaluate(()=>window.__kp.S().brokers)===2,'configuration broken after failed 3D load');
+  // A deliberately corrupted script is rejected by SRI; that expected browser error is not an app error.
+  page.errors = page.errors.filter(e => !e.includes('integrity') && !e.includes('valid digest'));
   noErrors(page);await page.context().close();
 });
 
