@@ -2303,6 +2303,7 @@ function tapeSlots(p) {
 }
 // Refresh one log in place, so a new message does not redraw the whole diagram
 function updateTape(p, appended) {
+  if (window.__kc3DActive) return; // Hidden SVG logs are rebuilt when returning to 2D.
   const L = logs[p], y = G.rowY(p);
   for (let i = 0; i < SLOTS; i++) {
     const o = L.leo - SLOTS + i, k = slotState(L, o), r = $(`s-${p}-${i}`), t = $(`so-${p}-${i}`);
@@ -2410,7 +2411,7 @@ function focusGroup(g) {
 function drawMap() {
   if (introTl) { introTl.progress(1); introTl = null; introDone = true; }
   syncLogs();
-  const prev = motionOK() ? snapshot() : new Map(), oldLeaders = G ? G.parts.map(s => s.leader) : null;
+  const prev = motionOK() && !window.__kc3DActive ? snapshot() : new Map(), oldLeaders = G ? G.parts.map(s => s.leader) : null;
   const oldOwn = G && G.own, oldGroups = G ? G.gs.map(g => g.name) : [];
   G = geom();
   detectRebalance(oldOwn, oldGroups);
@@ -2517,7 +2518,7 @@ function drawMap() {
   msgs.forEach(m => { m.el = null; });
   $('status').textContent = statusText();
   renderLag(true);
-  flip(prev, oldLeaders);
+  if (!window.__kc3DActive) flip(prev, oldLeaders);
   prevSig = `${G.B}|${G.P}|${G.C}|${S.rf}`;
   if (spatialExplorer) spatialExplorer.sync();
 }
@@ -3399,7 +3400,7 @@ function createSpatialExplorer() {
     cancel();
     $('status').textContent = statusText();
     if (use3D) { resize(); sync(); invalidate(); }
-    else { msgs.forEach(m => { if (m.el) m.el.remove(); m.el = null; }); }
+    else { msgs.forEach(m => { if (m.el) m.el.remove(); m.el = null; }); drawMap(); }
   }
   function loadThree() {
     if (window.THREE) return Promise.resolve(window.THREE);
