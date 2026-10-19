@@ -429,6 +429,8 @@ test('3D: mobile, dense topology, reduced motion and context loss', async () => 
   for(let i=0;i<2;i++)await page.click('#pb-groups-inc');
   assert(await page.locator('[data-partition]').count()===12,'partition navigation failed at maximum topology');
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'3D causes mobile page overflow');
+  await page.waitForTimeout(100);
+  assert(await page.evaluate(()=>{const v=document.getElementById('scene-viewport').getBoundingClientRect();return [...document.querySelectorAll('.scene-label')].every(el=>{const r=el.getBoundingClientRect();return r.left>=v.left&&r.right<=v.right;});}),'mobile component labels are clipped');
   await page.click('[data-partition="11"]');
   assert((await page.textContent('#inspect-title')).includes('Partition 11'),'last partition cannot be selected');
   await page.screenshot({ path:path.join(OUT,'spatial-mobile.png'),fullPage:true });

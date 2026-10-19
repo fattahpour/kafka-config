@@ -3366,7 +3366,7 @@ function createSpatialExplorer() {
   let active = false, visible = true, loading = null, wanted = false, unavailable = false;
   let timer = 0, raf = 0, lastStats = 0, selected = { type: 'overview', id: 0 };
   let yaw = .32, pitch = .63, zoom = 1, width = 1, height = 1, dragging = null;
-  let labels = [], targets = [], positions = {}, resources = [], topologySignature = '';
+  let labels = [], targets = [], positions = {}, resources = [], topologySignature = '', labelsDirty = true;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const quality = $('scene-quality');
   if (navigator.connection?.saveData || (navigator.deviceMemory && navigator.deviceMemory <= 4) || innerWidth < 680) quality.value = 'eco';
@@ -3493,9 +3493,9 @@ function createSpatialExplorer() {
   function cameraPosition() {
     if(!camera) return;
     // Fit width on phones instead of cropping producers and consumers.
-    const distance=Math.max(23, 19 / Math.max(.45,camera.aspect))*zoom;
+    const distance=Math.max(18, 24 / Math.max(.45,camera.aspect))*zoom;
     camera.position.set(Math.sin(yaw)*Math.cos(pitch)*distance, Math.sin(pitch)*distance+1.4, Math.cos(yaw)*Math.cos(pitch)*distance);
-    camera.lookAt(0,1.4,0); camera.updateMatrixWorld();
+    camera.lookAt(0,1.4,0); camera.updateMatrixWorld(); labelsDirty=true;
   }
   function resize() {
     if(!active || !renderer) return;
@@ -3550,7 +3550,7 @@ function createSpatialExplorer() {
     $('partition-nav').replaceChildren();
     const caption=document.createElement('span'); caption.textContent='Trace a partition';$('partition-nav').append(caption);
     G.parts.forEach(p=>{const b=document.createElement('button');b.type='button';b.textContent='P'+p.p;b.dataset.partition=p.p;b.setAttribute('aria-pressed','false');tooltip(b,'Inspect leader, replicas, writable state and consumer assignment for partition '+p.p);b.addEventListener('click',()=>select({type:'partition',id:p.p}));$('partition-nav').append(b);});
-    updateSelection();
+    labelsDirty=true; updateSelection();
   }
   function select(target){selected=target;updateSelection();inspect();invalidate();}
   function updateSelection(){
@@ -3614,7 +3614,20 @@ function createSpatialExplorer() {
       color.setHex(colors[m.kind]|| (m.kind==='read'?colors.consumer:colors.producer));particleMesh.setColorAt(count,color);count++;
     }
     particleMesh.count=count;particleMesh.instanceMatrix.needsUpdate=true;if(particleMesh.instanceColor)particleMesh.instanceColor.needsUpdate=true;
-    labels.forEach(l=>{point.copy(l.pos).project(camera);l.el.style.left=((point.x*.5+.5)*width)+'px';l.el.style.top=((-point.y*.5+.5)*height)+'px';l.el.hidden=point.z>1||point.z< -1;});
+    if(labelsDirty){
+      // DOM labels stay readable on narrow screens and only relayout when the camera changes.
+      const occupied=[];
+      labels.forEach(l=>{
+        point.copy(l.pos).project(camera);l.el.hidden=point.z>1||point.z< -1;if(l.el.hidden)return;
+        const w=l.el.offsetWidth,h=l.el.offsetHeight;
+        const left=clamp((point.x*.5+.5)*width-w/2,6,Math.max(6,width-w-6));
+        let top=clamp((-point.y*.5+.5)*height-h,8,height-h-60);
+        while(top>8&&occupied.some(r=>left<r.right+4&&left+w>r.left-4&&top<r.bottom+4&&top+h>r.top-4))top=Math.max(8,top-h-6);
+        occupied.push({left,right:left+w,top,bottom:top+h});
+        l.el.style.left=(left+w/2)+'px';l.el.style.top=(top+h)+'px';
+      });
+      labelsDirty=false;
+    }
     if(now-lastStats>500){stats();lastStats=now;}
     renderer.render(scene,camera);
     if(running)timer=setTimeout(()=>{timer=0;invalidate();},1000/(quality.value==='eco'?20:30));
