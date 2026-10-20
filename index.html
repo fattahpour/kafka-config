@@ -2521,6 +2521,7 @@ function drawMap() {
   if (!window.__kc3DActive) flip(prev, oldLeaders);
   prevSig = `${G.B}|${G.P}|${G.C}|${S.rf}`;
   if (spatialExplorer) spatialExplorer.sync();
+  if (chal) renderChal(); // Broker failures must refresh challenge checks even while paused.
 }
 function statusText() {
   const ps = G.parts;

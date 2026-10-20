@@ -203,15 +203,17 @@ test('every challenge can be solved with the controls', async () => {
   const page = await open({ settle: 2600 });
   const start = async id => { if (await page.$('#chal[hidden]')) await page.click('#chal-btn'); if (await page.$('[data-chal-act="list"]')) await page.click('[data-chal-act="list"]'); await page.click(`.chal-pick[data-chal="${id}"]`); await page.waitForTimeout(150); };
   const solved = async id => { await page.waitForTimeout(300); assert(await page.$('.chal-win'), `challenge "${id}" not marked solved; open checks: ` + (await page.$$eval('.chal-checks li:not(.ok)', l => l.map(x => x.textContent).join(' | ')))); };
-  const tile = (k, v) => page.click(`input[name="${k}"][value="${v}"]`, { force: true });
+  const tile = (k, v) => page.check(`input[name="${k}"][value="${v}"]`);
   const step = n => page.click(`.steps button[data-goto="${n}"]`);
 
   await start('survive'); assert(!(await page.$('.chal-win')), 'survive: solved before doing anything');
   await page.click('#pb-rf-inc'); await page.click('#pb-rf-inc'); await page.click('.ackseg[data-acks="all"]');
   await step(1); await page.click('#minIsr-inc'); await page.waitForTimeout(500);
+  await page.click('#play'); // Challenge checks must also refresh while the simulation is paused.
   // the broker cards may still be settling from the last change; click until broker 1 is really off
   for (let i = 0; i < 3 && !(await page.$('.bhead[data-b="0"] .bchip.off')); i++) { await page.click('.bhead[data-b="0"]'); await page.waitForTimeout(300); }
   await solved('survive');
+  await page.click('#play');
 
   await start('order'); await step(2);
   await page.fill('#newKey', 'customer-9'); await page.click('[data-act="addkey"]');
@@ -298,7 +300,7 @@ test('new settings: transactions, static membership, zones, size limit, buffer, 
 
 test('delivery guarantees: each applies standard settings, code and a comparison', async () => {
   const page = await open();
-  const pick = async v => { await page.click('.steps button[data-goto="0"]'); await page.click(`input[name="semantic"][value="${v}"]`, { force: true }); await page.waitForTimeout(80); return page.evaluate(() => ({ S: window.__kp.S(), f: window.__kp.files() })); };
+  const pick = async v => { await page.click('.steps button[data-goto="0"]'); await page.check(`input[name="semantic"][value="${v}"]`); await page.waitForTimeout(80); return page.evaluate(() => ({ S: window.__kp.S(), f: window.__kp.files() })); };
   let { S, f } = await pick('amo');
   assert(S.acks === '1' && S.retries === '0' && S.commitWhen === 'before' && !S.txn, 'at most once settings: ' + JSON.stringify([S.acks, S.retries, S.commitWhen]));
   const loop = f['ConsumerLoop.java'];
